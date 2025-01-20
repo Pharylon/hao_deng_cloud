@@ -1,0 +1,16 @@
+{
+    "domain": "hao_deng_cloud",
+    "name": "Hao Deng Cloud",
+    "codeowners": ["@Pharylon"],
+    "dependencies": [],
+    "documentation": "https://github.com/Pharylon/hao_deng_cloud",
+    "integration_type": "service",
+    "iot_class": "cloud_push",
+    "requirements": [
+        "pycryptodome>=3.17",
+        "cryptography",
+        "paho-mqtt"
+    ],
+    "config_flow": true,
+    "version": "0.1.0"
+  }
