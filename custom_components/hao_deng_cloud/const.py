@@ -1,6 +1,6 @@
 """Constants for Hao Deng Lights Integration."""
 
-DOMAIN = "hao_deng_lights"
+DOMAIN = "hao_deng_cloud"
 
 MAGICHUE_COUNTRY_SERVERS = [
     {
