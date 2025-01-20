@@ -9,7 +9,7 @@ control the above lights that you'd normally use through the Hao Deng App
 
 
 ## Install with HACS (recommended)
-
+se
 Do you have [HACS](https://hacs.xyz/) installed?
 1. Add **Hao Deng Cloud Component** as custom repository.
    1. Go to: `HACS` -> `Integrations` -> Click menu in right top -> Custom repositories
