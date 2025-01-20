@@ -1,15 +1,18 @@
+"""Helper functions for color conversion and comparison."""
+
 import math
 
 
 def hsl_to_rgb(hue: int, saturation: float, luminosity: float):
-    """Converts HSL color values to RGB color values."""
+    """Convert HSL color values to RGB color values."""
 
     if not 0 <= hue <= 360:
-        raise ValueError("Hue value must be between 0 and 360")
-    if not 0.1 <= saturation <= 1.0:
-        raise ValueError("Saturation value must be between 0.1 and 1.0")
-    if not 0.1 <= luminosity <= 1.0:
-        raise ValueError("Luminosity value must be between 0.1 and 1.0")
+        raise ValueError(f"Hue value must be between 0 and 360. Value was {hue}")
+    if luminosity <= 0 or saturation <= 0:
+        return (0, 0, 0)
+
+    saturation = min(saturation, 1)  # Can't be higher than 1
+    luminosity = min(luminosity, 1)  # Can't be higher than 1
 
     hue /= 360
     if luminosity <= 0.5:
