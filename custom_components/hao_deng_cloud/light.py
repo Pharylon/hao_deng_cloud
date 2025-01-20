@@ -142,7 +142,8 @@ class MyRGBLight(LightEntity):
             _LOGGER.info("Skipping update, too soon after we issued a command")
             return  # We just updated the light, this is probably just the echo of that.
         if rgb[0] == 0 and rgb[1] == 0 and rgb[2] == 0:
-            self.turn_off()
+            self._is_on = False
+            self.schedule_update_ha_state()
             return
         rgb_distance = get_rgb_distance(
             [
@@ -208,7 +209,7 @@ class MyRGBLight(LightEntity):
 
     async def async_turn_off(self, **kwargs) -> None:
         """Turn the light off."""
-        _LOGGER.info("TURN OFF")
+        _LOGGER.info("TURN OFF ASYNC")
         self._mqtt_connector.turn_off(self._mesh_id)
         self._is_on = False
         # Send command to your RGB light to turn off

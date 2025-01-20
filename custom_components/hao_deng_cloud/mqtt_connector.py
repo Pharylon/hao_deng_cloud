@@ -140,7 +140,7 @@ class MqttConnector:
         saturation_percent = int(saturation, 16) / 63
         brightness = data[2:4]
         bright_percent = int(brightness, 16) / 100 / 2
-        if saturation_percent == 0:
+        if saturation_percent == 0 or bright_percent == 0:
             return (0, 0, 0)
         _LOGGER.info(
             "Translated HSL: %s %s %s", hue_360, saturation_percent, bright_percent
