@@ -2,18 +2,21 @@ import asyncio
 import json
 import logging
 import math
-from .pocos import MqttControlData, MqttLightPayload
+import uuid
+
 import paho.mqtt.client as mqtt
+
 from .color_helper import hsl_to_rgb
 from .const import MAGICHUE_COUNTRY_SERVERS
-import threading
-import uuid
+from .pocos import MqttControlData, MqttLightPayload
 
 # The callback for when a PUBLISH message is received from the server.
 
 _LOGGER = logging.getLogger(__name__)
 
 lock = asyncio.Lock()
+
+__SLEEP_TIME__ = 0.05
 
 
 def on_subscribe(client, userdata, mid, granted_qos):
@@ -75,8 +78,16 @@ class MqttConnector:
 
     async def set_color(self, deviceId: int, red: int, green: int, blue: int):
         async with lock:
-            if red > 255 or green > 255 or blue > 255 or red < 0 or green < 0 or blue < 0:
-                raise Exception("Invalid RGB values")
+            if (
+                red > 255
+                or green > 255
+                or blue > 255
+                or red < 0
+                or green < 0
+                or blue < 0
+            ):
+                _LOGGER.error("Invalid RGB values")
+                return
             while red + green + blue > 630:
                 print(
                     f"Total RGB values too high ({red}/{green}/{blue}). Lowering them for safety"
@@ -85,7 +96,11 @@ class MqttConnector:
                 green = green - 1
                 blue = blue - 1
             _LOGGER.info(
-                "SET_COLOR for ID %s Red: %s Green %s Blue %s", deviceId, red, green, blue
+                "SET_COLOR for ID %s Red: %s Green %s Blue %s",
+                deviceId,
+                red,
+                green,
+                blue,
             )
             hexValue = f"{int(red):02x}{int(green):02x}{int(blue):02x}".upper()
             payload = MqttLightPayload(deviceId, "E2", f"0560{hexValue}00000200")
@@ -94,9 +109,9 @@ class MqttConnector:
                 f"/{self.software.productKey}/{self.software.deviceName}/control",
                 payloadJson,
             )
-            #Sleep is necessary to avoid race condition when updating multiple lights at once.
-            #It's unclear if this is an issue with MagicHue or paho-mqtt
-            await asyncio.sleep(0.1) 
+            # Sleep is necessary to avoid race condition when updating multiple lights at once.
+            # It's unclear if this is an issue with MagicHue or paho-mqtt
+            await asyncio.sleep(__SLEEP_TIME__)
 
     async def turn_on(self, deviceId: int):
         """Turn the light on."""
@@ -107,11 +122,12 @@ class MqttConnector:
             response = self.client.publish(
                 f"/{self.software.productKey}/{self.software.deviceName}/control",
                 payloadJson,
+                1,
             )
-            response.wait_for_publish()
-            #Sleep is necessary to avoid race condition when updating multiple lights at once.
-            #It's unclear if this is an issue with MagicHue or paho-mqtt
-            await asyncio.sleep(0.1) 
+            response.wait_for_publish(5)
+            # Sleep is necessary to avoid race condition when updating multiple lights at once.
+            # It's unclear if this is an issue with MagicHue or paho-mqtt
+            await asyncio.sleep(__SLEEP_TIME__)
 
     async def turn_off(self, deviceId: int):
         """Turn the light off."""
@@ -122,11 +138,12 @@ class MqttConnector:
             response = self.client.publish(
                 f"/{self.software.productKey}/{self.software.deviceName}/control",
                 payloadJson,
+                1,
             )
-            response.wait_for_publish()
-            #Sleep is necessary to avoid race condition when updating multiple lights at once.
-            #It's unclear if this is an issue with MagicHue or paho-mqtt
-            await asyncio.sleep(0.1)
+            response.wait_for_publish(5)
+            # Sleep is necessary to avoid race condition when updating multiple lights at once.
+            # It's unclear if this is an issue with MagicHue or paho-mqtt
+            await asyncio.sleep(__SLEEP_TIME__)
 
     async def set_color_temp(self, deviceId: int, color_temp: int, brigthness: int):
         """Set color temperature of light."""
@@ -147,9 +164,9 @@ class MqttConnector:
                     f"/{self.software.productKey}/{self.software.deviceName}/control",
                     payloadJson,
                 )
-                #Sleep is necessary to avoid race condition when updating multiple lights at once.
-                #It's unclear if this is an issue with MagicHue or paho-mqtt
-                await asyncio.sleep(0.1)
+                # Sleep is necessary to avoid race condition when updating multiple lights at once.
+                # It's unclear if this is an issue with MagicHue or paho-mqtt
+                await asyncio.sleep(__SLEEP_TIME__)
 
     def convert_notification_data_to_rgb(self, data: str) -> tuple[int, int, int]:
         hue = data[6:8]
