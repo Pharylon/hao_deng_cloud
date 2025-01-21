@@ -126,7 +126,7 @@ class MyRGBLight(LightEntity):
         # if the new color was created outside of Home Assistant.
         # In this case, at least we'll have something close in HA.
         _LOGGER.info("Update_light %s: %s", self._attr_name, repr(rgb))
-        if (time.time() - self._last_update) < 2:
+        if time.time() - self._last_update < 5:
             _LOGGER.info("Skipping update, too soon after we issued a command")
             return  # We just updated the light, this is probably just the echo of that.
         if rgb[0] == 0 and rgb[1] == 0 and rgb[2] == 0:
