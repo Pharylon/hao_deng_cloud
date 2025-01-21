@@ -73,35 +73,30 @@ class MqttConnector:
         self.client = mqttc
         mqttc.loop_start()
 
-    def set_color(self, deviceId: int, red: int, green: int, blue: int):
-        if red > 255 or green > 255 or blue > 255 or red < 0 or green < 0 or blue < 0:
-            raise Exception("Invalid RGB values")
-        while red + green + blue > 630:
-            print(
-                f"Total RGB values too high ({red}/{green}/{blue}). Lowering them for safety"
+    async def set_color(self, deviceId: int, red: int, green: int, blue: int):
+        async with lock:
+            if red > 255 or green > 255 or blue > 255 or red < 0 or green < 0 or blue < 0:
+                raise Exception("Invalid RGB values")
+            while red + green + blue > 630:
+                print(
+                    f"Total RGB values too high ({red}/{green}/{blue}). Lowering them for safety"
+                )
+                red = red - 1
+                green = green - 1
+                blue = blue - 1
+            _LOGGER.info(
+                "SET_COLOR for ID %s Red: %s Green %s Blue %s", deviceId, red, green, blue
             )
-            red = red - 1
-            green = green - 1
-            blue = blue - 1
-        _LOGGER.info(
-            "SET_COLOR for ID %s Red: %s Green %s Blue %s", deviceId, red, green, blue
-        )
-        hexValue = f"{int(red):02x}{int(green):02x}{int(blue):02x}".upper()
-        payload = MqttLightPayload(deviceId, "E2", f"0560{hexValue}00000200")
-        payloadJson = json.dumps(payload.__dict__)
-        # sample = json.loads('{"dstAdr":19,"opCode":"E2","data":"0560FF000000000200"}')
-        # sample2 = json.loads(payloadJson)
-        # print(sample2['dstAdr'] == sample['dstAdr'])
-        # print(sample2['opCode'] == sample['opCode'])
-        # print(sample2['data'].upper() == sample['data'].upper())
-        # print(sample['data'])
-        # print(sample2['data'])
-
-        # self.client.publish("/TLdnl8aKqCL/2c9459fd87084f1201873d5b002507ba/control", payloadJson) #red
-        self.client.publish(
-            f"/{self.software.productKey}/{self.software.deviceName}/control",
-            payloadJson,
-        )
+            hexValue = f"{int(red):02x}{int(green):02x}{int(blue):02x}".upper()
+            payload = MqttLightPayload(deviceId, "E2", f"0560{hexValue}00000200")
+            payloadJson = json.dumps(payload.__dict__)
+            self.client.publish(
+                f"/{self.software.productKey}/{self.software.deviceName}/control",
+                payloadJson,
+            )
+            #Sleep is necessary to avoid race condition when updating multiple lights at once.
+            #It's unclear if this is an issue with MagicHue or paho-mqtt
+            await asyncio.sleep(0.1) 
 
     async def turn_on(self, deviceId: int):
         """Turn the light on."""
@@ -114,7 +109,9 @@ class MqttConnector:
                 payloadJson,
             )
             response.wait_for_publish()
-            await asyncio.sleep(0.1)
+            #Sleep is necessary to avoid race condition when updating multiple lights at once.
+            #It's unclear if this is an issue with MagicHue or paho-mqtt
+            await asyncio.sleep(0.1) 
 
     async def turn_off(self, deviceId: int):
         """Turn the light off."""
@@ -127,26 +124,32 @@ class MqttConnector:
                 payloadJson,
             )
             response.wait_for_publish()
+            #Sleep is necessary to avoid race condition when updating multiple lights at once.
+            #It's unclear if this is an issue with MagicHue or paho-mqtt
             await asyncio.sleep(0.1)
 
-    def set_color_temp(self, deviceId: int, color_temp: int, brigthness: int):
+    async def set_color_temp(self, deviceId: int, color_temp: int, brigthness: int):
         """Set color temperature of light."""
-        color_temp = color_temp or 2000
-        if 2000 <= color_temp <= 6535:
-            # Calculate the proportion of the input number within its range
-            proportion = (color_temp - 2000) / (6535 - 2000)
-            # Scale the proportion to the output range (0-100)
-            translated_number = proportion * 100
-            hex_value = f"{int(translated_number):02x}"
-            brightness_value = f"{int(math.ceil(brigthness * 64 / 255)):02x}"
-            payload = MqttLightPayload(
-                deviceId, "E2", f"0562{hex_value}{brightness_value}0000000200"
-            )
-            payloadJson = json.dumps(payload.__dict__)
-            self.client.publish(
-                f"/{self.software.productKey}/{self.software.deviceName}/control",
-                payloadJson,
-            )
+        async with lock:
+            color_temp = color_temp or 5000
+            if 2000 <= color_temp <= 6535:
+                # Calculate the proportion of the input number within its range
+                proportion = (color_temp - 2000) / (6535 - 2000)
+                # Scale the proportion to the output range (0-100)
+                translated_number = proportion * 100
+                hex_value = f"{int(translated_number):02x}"
+                brightness_value = f"{int(math.ceil(brigthness * 64 / 255)):02x}"
+                payload = MqttLightPayload(
+                    deviceId, "E2", f"0562{hex_value}{brightness_value}0000000200"
+                )
+                payloadJson = json.dumps(payload.__dict__)
+                self.client.publish(
+                    f"/{self.software.productKey}/{self.software.deviceName}/control",
+                    payloadJson,
+                )
+                #Sleep is necessary to avoid race condition when updating multiple lights at once.
+                #It's unclear if this is an issue with MagicHue or paho-mqtt
+                await asyncio.sleep(0.1)
 
     def convert_notification_data_to_rgb(self, data: str) -> tuple[int, int, int]:
         hue = data[6:8]

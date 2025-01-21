@@ -176,7 +176,7 @@ class MyRGBLight(LightEntity):
                     new_rgb.append(color)
                 self._rgb_color = new_rgb
             else:
-                self._mqtt_connector.set_color_temp(
+                await self._mqtt_connector.set_color_temp(
                     self._mesh_id, self._attr_color_temp, self._brightness
                 )
                 self.async_write_ha_state()
@@ -189,7 +189,7 @@ class MyRGBLight(LightEntity):
                 self._attr_name,
                 repr(kwargs[ATTR_COLOR_TEMP_KELVIN]),
             )
-            self._mqtt_connector.set_color_temp(
+            await self._mqtt_connector.set_color_temp(
                 self._mesh_id, kwargs[ATTR_COLOR_TEMP_KELVIN], self._brightness
             )
             self.async_write_ha_state()
@@ -198,7 +198,7 @@ class MyRGBLight(LightEntity):
             await self.just_turn_on()
             return
 
-        self._mqtt_connector.set_color(
+        await self._mqtt_connector.set_color(
             self._mesh_id,
             self._rgb_color[0],
             self._rgb_color[1],
