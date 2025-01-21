@@ -28,7 +28,6 @@ async def async_setup_entry(
     hass: HomeAssistant, config_entry: ConfigEntry, add_entities: AddEntitiesCallback
 ) -> bool:
     """Set up the light platform."""
-    _LOGGER.warning("DOMAIN DATA %s", repr(config_entry.data))
 
     rest_connector = RestApiConnector(
         config_entry.data["username"],
@@ -81,9 +80,8 @@ class MyRGBLight(LightEntity):
         self._last_update = 0
 
         def update_light(a, d):
-            _LOGGER.info("update_light: A: %d, D: %s", a, d)
             if a == self._mesh_id:
-                _LOGGER.info("Updating Light %s", self._attr_name)
+                _LOGGER.info("Received update for Light %s", self._attr_name)
                 self.update_light(d)
 
         mqtt_connector.subscribe(update_light)
@@ -103,31 +101,21 @@ class MyRGBLight(LightEntity):
             adjusted_colors.append(adjusted_value)
         return adjusted_colors
 
-    def normalize_colors(self, red: int, green: int, blue: int) -> list[int]:
-        # _LOGGER.info("Initial Values %d %d %d %d", red, green, blue, brightness)
-        # hsv = colorsys.rgb_to_hsv(red, green, blue)
-        # newRgb = colorsys.hsv_to_rgb(hsv[0], hsv[1], brightness)
-        # _LOGGER.info("New Values %d %d %d", red, green, blue)
-        if red > 0 and red < 20:
-            red = red - min([10, red])
-        if green > 0 and green < 20:
-            green = green - min([10, green])
-        if blue > 0 and blue < 20:
-            blue = blue - min([10, blue])
-
-        # adjusted = [
-        #     int(red * brightness / 255),
-        #     int(green * brightness / 255),
-        #     int(blue * brightness / 255),
-        # ]
-        # _LOGGER.info(
-        #     "Final Values %d %d %d %d",
-        #     adjusted[0],
-        #     adjusted[1],
-        #     adjusted[2],
-        #     brightness,
-        # )
-        return [red, green, blue]
+    def normalize_colors(
+        self, red: int, green: int, blue: int, brightness: int
+    ) -> list[int]:
+        adjusted = [
+            int(red * brightness / 255),
+            int(green * brightness / 255),
+            int(blue * brightness / 255),
+        ]
+        max_color = max(adjusted)
+        normalized = []
+        for color in adjusted:
+            if max_color > 100 and color > 0 and color < 20:
+                color = color - min([10, color])
+            normalized.append(color)
+        return normalized
 
     def update_light(self, rgb: tuple[int, int, int]):
         """Fetch new state data for this light."""
@@ -137,7 +125,7 @@ class MyRGBLight(LightEntity):
         # the correct color. We should really only update this way
         # if the new color was created outside of Home Assistant.
         # In this case, at least we'll have something close in HA.
-        _LOGGER.info("Update_light %s", repr(rgb))
+        _LOGGER.info("Update_light %s: %s", self._attr_name, repr(rgb))
         if (time.time() - self._last_update) < 10:
             _LOGGER.info("Skipping update, too soon after we issued a command")
             return  # We just updated the light, this is probably just the echo of that.
@@ -155,42 +143,56 @@ class MyRGBLight(LightEntity):
         )
         if rgb_distance < 50:  # the color is 'close enough', we don't need to update
             return
-        _LOGGER.info("UPDATING from Hao Deng to %s", repr(rgb))
+        _LOGGER.info("UPDATING ID %s from Hao Deng to %s", self._attr_name, repr(rgb))
         self._is_on = True
         self._rgb_color = rgb
         self.schedule_update_ha_state()
 
     async def async_turn_on(self, **kwargs) -> None:
         """Turn the light on."""
-
-        _LOGGER.info("TURN ON")
+        _LOGGER.info("TURN ON %s", self._attr_name)
+        self._is_on = True
+        # self._ignore_next_update = True
+        self._last_update = time.time()
         if ATTR_RGB_COLOR in kwargs:
-            self._brightness = 255
+            self._attr_color_mode = ColorMode.RGB
             normalized_colors = self.normalize_colors(
                 kwargs[ATTR_RGB_COLOR][0],
                 kwargs[ATTR_RGB_COLOR][1],
                 kwargs[ATTR_RGB_COLOR][2],
+                self._brightness,
             )
             self._rgb_color = normalized_colors
-            _LOGGER.info("BRIGTHNESS %s", self._brightness)
-            _LOGGER.info("COLOR %s", repr(kwargs[ATTR_RGB_COLOR]))
-            # self._rgb_color = kwargs[ATTR_RGB_COLOR]
-            _LOGGER.info("COLOR %s", repr(self._rgb_color))
-            # Send command to your RGB light to set the color
         elif ATTR_BRIGHTNESS in kwargs:
-            _LOGGER.info("BRIGTHNESS %s", repr(kwargs[ATTR_BRIGHTNESS]))
             self._brightness = kwargs[ATTR_BRIGHTNESS]
-            base_colors = self.get_base_colors(self._rgb_color)
-            new_rgb = []
-            for color in base_colors:
-                color = color * self._brightness / 255
-                new_rgb.append(color)
-            self._rgb_color = new_rgb
-        elif ATTR_COLOR_TEMP_KELVIN in kwargs:
-            _LOGGER.info("COLOR TEMP %s", repr(kwargs[ATTR_COLOR_TEMP_KELVIN]))
-            self._mqtt_connector.set_color_temp(
-                self._mesh_id, kwargs[ATTR_COLOR_TEMP_KELVIN]
+            _LOGGER.info(
+                "BRIGTHNESS %s: %s", self._attr_name, repr(kwargs[ATTR_BRIGHTNESS])
             )
+            if self._attr_color_mode == ColorMode.RGB:
+                base_colors = self.get_base_colors(self._rgb_color)
+                new_rgb = []
+                for color in base_colors:
+                    color = color * self._brightness / 255
+                    new_rgb.append(color)
+                self._rgb_color = new_rgb
+            else:
+                self._mqtt_connector.set_color_temp(
+                    self._mesh_id, self._attr_color_temp, self._brightness
+                )
+                self.async_write_ha_state()
+                return
+        elif ATTR_COLOR_TEMP_KELVIN in kwargs:
+            self._attr_color_mode = ColorMode.COLOR_TEMP
+            self._attr_color_temp_kelvin = kwargs[ATTR_COLOR_TEMP_KELVIN]
+            _LOGGER.info(
+                "COLOR TEMPT %s: %s",
+                self._attr_name,
+                repr(kwargs[ATTR_COLOR_TEMP_KELVIN]),
+            )
+            self._mqtt_connector.set_color_temp(
+                self._mesh_id, kwargs[ATTR_COLOR_TEMP_KELVIN], self._brightness
+            )
+            self.async_write_ha_state()
             return
         else:
             await self.just_turn_on()
@@ -202,15 +204,12 @@ class MyRGBLight(LightEntity):
             self._rgb_color[1],
             self._rgb_color[2],
         )
-        self._is_on = True
-        # self._ignore_next_update = True
-        self._last_update = time.time()
         self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs) -> None:
         """Turn the light off."""
-        _LOGGER.info("TURN OFF ASYNC")
-        self._mqtt_connector.turn_off(self._mesh_id)
+        _LOGGER.info("TURN OFF ASYNC %s", self._attr_name)
+        await self._mqtt_connector.turn_off(self._mesh_id)
         self._is_on = False
         # Send command to your RGB light to turn off
         self._last_update = time.time()
@@ -218,8 +217,8 @@ class MyRGBLight(LightEntity):
 
     async def just_turn_on(self) -> None:
         """Turn the light off."""
-        _LOGGER.info("JUST TURN ON")
-        self._mqtt_connector.turn_on(self._mesh_id)
+        _LOGGER.info("JUST TURN ON %s", self._attr_name)
+        await self._mqtt_connector.turn_on(self._mesh_id)
         self._is_on = True
         # Send command to your RGB light to turn off
         self._last_update = time.time()
