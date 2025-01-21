@@ -4,12 +4,12 @@
 <img src="https://play-lh.googleusercontent.com/RlOT4SdOj8mLhbOJPwyv_VHqY72vAQzJdGq1YKB2yIufEPIKaYIk1SKODkOTZLnjBg" width="100" height="100"> <img src="https://m.media-amazon.com/images/I/414M0i-ED-L.jpg" width="100" height="100">
 
 Control your Hao Deng Lights mesh lights from Home Assistant! This integration allows you to
-control the above lights that you'd normally use through the Hao Deng App
+control the above lights that you'd normally use through the Hao Deng App.
 
+Note that this integration does require the wifi bridge for your lights (it does not use Bluetooth), instead using the MagicHue mqtt broker.
 
 
 ## Install with HACS (recommended)
-se
 Do you have [HACS](https://hacs.xyz/) installed?
 1. Add **Hao Deng Cloud Component** as custom repository.
    1. Go to: `HACS` -> `Integrations` -> Click menu in right top -> Custom repositories
@@ -31,7 +31,7 @@ Do you have [HACS](https://hacs.xyz/) installed?
 1. In Home Assistant click on `Settings`
 1. Click on `Devices & services`
 1. Click on `+ Add integration`
-1. Search for and select `How Deng Cloud`
+1. Search for and select `Hao Deng Cloud`
 1. Enter you `username` and `password` you also use in the **Hao Deng** app
 1. The system will download you light list and add them to Home Assistant
 1. Once the system could connect to one of the lights your lights will show up as _available_ and can be controlled from HA   
@@ -49,7 +49,7 @@ Add `custom_components.hao_deng_cloud: debug` to the `logger` config in you `con
 logger:
   default: error
   logs:
-     custom_components.zenggemesh: debug
+     custom_components.hao_deng_cloud: debug
 ```
 Restart Home Assistant for logging to begin.<br/>
 Logs can be found under Settings - System - Logs - Home Assistant Core<br/>
