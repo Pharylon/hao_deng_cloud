@@ -50,6 +50,7 @@ async def async_setup_entry(
         lights.append(light)
 
     add_entities(lights)
+    mqtt_connector.request_status() #Get initial status of lights
 
     return True
 

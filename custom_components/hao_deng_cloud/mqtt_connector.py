@@ -183,3 +183,7 @@ class MqttConnector:
 
     def subscribe(self, callback):
         self.subscriptions.append(callback)
+
+    def request_status(self):
+        payloadJson = json.dumps({"type":"immediateNOW","ver":1})
+        self.client.publish(f"/{self.software.productKey}/{self.software.deviceName}/request", payloadJson)
