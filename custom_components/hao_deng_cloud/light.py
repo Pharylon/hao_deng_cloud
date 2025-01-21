@@ -50,7 +50,7 @@ async def async_setup_entry(
         lights.append(light)
 
     add_entities(lights)
-    mqtt_connector.request_status() #Get initial status of lights
+    mqtt_connector.request_status()  # Get initial status of lights
 
     return True
 
@@ -126,7 +126,7 @@ class MyRGBLight(LightEntity):
         # the correct color. We should really only update this way
         # if the new color was created outside of Home Assistant.
         # In this case, at least we'll have something close in HA.
-        _LOGGER.info("Update_light %s: %s", self._attr_name, repr(rgb))
+        _LOGGER.info("Update_light %s: %s %s", self._attr_name, repr(rgb), self._is_on)
         if (time.time() - self._last_update) < 2:
             _LOGGER.info("Skipping update, too soon after we issued a command")
             return  # We just updated the light, this is probably just the echo of that.
@@ -211,18 +211,18 @@ class MyRGBLight(LightEntity):
     async def async_turn_off(self, **kwargs) -> None:
         """Turn the light off."""
         _LOGGER.info("TURN OFF ASYNC %s", self._attr_name)
+        self._is_on = False
         self.async_write_ha_state()
         await self._mqtt_connector.turn_off(self._mesh_id)
-        self._is_on = False
         # Send command to your RGB light to turn off
         self._last_update = time.time()
 
     async def just_turn_on(self) -> None:
         """Turn the light off."""
         _LOGGER.info("JUST TURN ON %s", self._attr_name)
+        self._is_on = True
         self.async_write_ha_state()
         await self._mqtt_connector.turn_on(self._mesh_id)
-        self._is_on = True
         # Send command to your RGB light to turn off
         self._last_update = time.time()
 

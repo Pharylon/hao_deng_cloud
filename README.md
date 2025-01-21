@@ -6,7 +6,7 @@
 Control your Hao Deng Lights mesh lights from Home Assistant! This integration allows you to
 control the above lights that you'd normally use through the Hao Deng App.
 
-Note that this integration does require the wifi bridge for your lights (it does not use Bluetooth), instead using the MagicHue mqtt broker.
+Note that this integration does require the wifi bridge for your lights (it does not use Bluetooth).
 
 
 ## Install with HACS (recommended)
@@ -38,6 +38,8 @@ Do you have [HACS](https://hacs.xyz/) installed?
 1. Enjoy :)
 
 ## Troubleshooting
+**This integration requires the cloud**
+It will not work unless you have the wifi bridge, as this implementation is reverse-engineering their MQTT broker opcodes.
 If you run into issues during setup or controlling the lights please increase logging and provide them when creating an issue:
 
 Add `custom_components.hao_deng_cloud: debug` to the `logger` config in you `configuration.yaml`:
