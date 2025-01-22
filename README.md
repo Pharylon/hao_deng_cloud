@@ -8,7 +8,6 @@ control the above lights that you'd normally use through the Hao Deng App.
 
 Note that this integration does require the wifi bridge for your lights (it does not use Bluetooth).
 
-
 ## Install with HACS (recommended)
 Do you have [HACS](https://hacs.xyz/) installed?
 1. Add **Hao Deng Cloud Component** as custom repository.
@@ -39,10 +38,10 @@ Do you have [HACS](https://hacs.xyz/) installed?
 
 ## Troubleshooting
 **This integration requires the cloud**
-It will not work unless you have the wifi bridge, as this implementation is reverse-engineering their MQTT broker opcodes.
-If you run into issues during setup or controlling the lights please increase logging and provide them when creating an issue:
-
-Add `custom_components.hao_deng_cloud: debug` to the `logger` config in you `configuration.yaml`:
+1. Make sure it works through the Hao Deng app (this integration does not work unless you can control your lights through that app)
+2. Make sure your country code is correct
+3. Make sure you have the newest version of this integration installed
+4. Before submitting an issue, add `custom_components.hao_deng_cloud: debug` to the `logger` config in you `configuration.yaml`:
 
 ```yaml
 logger:
@@ -52,7 +51,7 @@ logger:
 ```
 Restart Home Assistant for logging to begin.<br/>
 Logs can be found under Settings - System - Logs - Home Assistant Core<br/>
-Be sure to click **Load Full Logs** in order to retrieve all logs.<br/>
+Be sure to click **Load Full Logs** in order to retrieve all logs and submit those with any issues.<br/>
 
 ## Credits
 Credit to 
