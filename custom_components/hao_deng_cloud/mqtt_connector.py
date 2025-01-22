@@ -16,7 +16,7 @@ _LOGGER = logging.getLogger(__name__)
 
 lock = asyncio.Lock()
 
-__SLEEP_TIME__ = 0.05
+__SLEEP_TIME__ = 0.1
 
 
 def on_subscribe(client, userdata, mid, granted_qos):
