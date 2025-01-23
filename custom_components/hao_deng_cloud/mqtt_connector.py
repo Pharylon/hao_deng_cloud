@@ -37,13 +37,19 @@ class MqttConnector:
     ):
         self.subscriptions = []
         self._country_code = country_code
-        self._devices: list[Device] = devices
         self._queue: list[MqttLightPayload] = []
         for x in controlData:
             if x.deviceType == "HARDWARE":
                 self.hardware = x
             elif x.deviceType == "SOFTWARE":
                 self.software = x
+        self._groups: dict[int, list[int]] = {}
+        self._devices = devices
+        for d in devices:
+            for g in d.groups:
+                if g not in self._groups:
+                    self._groups[g] = []
+                self._groups[g].append(d.meshAddress)
 
     def get_server_addr(self):
         """Get the server address for the country code."""
@@ -167,60 +173,29 @@ class MqttConnector:
             grouped_by_data[p.data].append(p)
         return grouped_by_data
 
-    def _group_payloads_by_group_id(self, payloads: list[MqttLightPayload]):
-        """Group all payloads by their group ID, so we can send the control message to the group instead of each individual device."""
-        group_buckets = {}
-        for p in payloads:
-            for d in self._devices:
-                if d.meshAddress == p.dstAdr:
-                    for g in d.groups:
-                        if g > 0:
-                            if g not in group_buckets:
-                                group_buckets[g] = []
-                            group_buckets[g].append(p)
-                            _LOGGER.info("Adding %s to %g", p.dstAdr, g)
-        # Order the groups from largest to most to least full
-        sorted_groups = sorted(
-            group_buckets.items(), key=lambda item: len(item[1]), reverse=True
-        )
-        return sorted_groups
+    def _create_group_payloads(self, payloads: list[MqttLightPayload]):
+        """Group all payloads by their group ID, so we can send the control message to the group instead of each individual device.
+        Payloads should already have the same OpCode and Data at this stage.
+        """  # noqa: D205
 
-    def _create_group_payloads(self, payloads):
-        # queue_ids = [p.dstAdr for p in self._queue]
-        # print("MyQueue", queue_ids)
-        final_paylods: list[MqttLightPayload] = []
-        sending_destinations: list[int] = []
-        grouped_requests = self._group_payloads_by_group_id(payloads)
-        # print("Grouped Length ", len(grouped_requests))
-        for my_tuple in grouped_requests:
-            groupId: int = my_tuple[0]
-            payload_list: list[MqttLightPayload] = my_tuple[1]
-            # print(f"Starting Group ID {groupId} Len ", len(payload_list))
-            paylods_not_queued = [
-                p for p in payload_list if p.dstAdr not in sending_destinations
-            ]
-            if len(paylods_not_queued) > 0:
-                for p in paylods_not_queued:
-                    sending_destinations.extend([p.dstAdr])
-                    # print("Sending Destingations", sending_destinations)
-                payload_for_group = MqttLightPayload(
-                    groupId, payload_list[0].opCode, payload_list[0].data
+        final_payloads: list[MqttLightPayload] = []
+        mesh_addresses = [x.dstAdr for x in payloads]
+        for group_id, group_addresses in self._groups.items():
+            if all(addr in mesh_addresses for addr in group_addresses):
+                group_payload = MqttLightPayload(
+                    group_id, payloads[0].opCode, payloads[0].data
                 )
-                payload_for_group.dstAdr = groupId
-                final_paylods.append(payload_for_group)
-        # These paylods were not sent as part of a group
-        # print("NOt Final_not_queued %s", len(paylods_not_queued))
-        # print("SENDING DEST", sending_destinations)
-        paylods_not_queued = [
-            p for p in payloads if p.dstAdr not in sending_destinations
-        ]
-        # queue_ids = [p.dstAdr for p in self._queue]
-        # print("MyQueue", queue_ids)
-        # payload_ids_not_qued = [p.dstAdr for p in paylods_not_queued]
-        # print("Final_not_queued ", payload_ids_not_qued)
-        final_paylods.extend(paylods_not_queued)
-        # print("Number of payloads to send: ", len(final_paylods))
-        return final_paylods
+                final_payloads.append(group_payload)
+        group_address_payloads = [x.dstAdr for x in final_payloads]
+        for p in payloads:
+            device = next((x for x in self._devices if x.meshAddress == p.dstAdr), None)
+            if device is not None:
+                already_queued = [
+                    g_id for g_id in device.groups if g_id in group_address_payloads
+                ]
+                if len(already_queued) == 0:
+                    final_payloads.append(p)
+        return final_payloads
 
     def _send_queue(self):
         if len(self._queue) > 0:
