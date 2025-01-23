@@ -37,7 +37,7 @@ async def async_setup_entry(
     await rest_connector.connect()
     devices: list[Device] = await rest_connector.devices()
     controlData = await rest_connector.get_mqtt_control_data()
-    mqtt_connector = MqttConnector(controlData, config_entry.data["country"])
+    mqtt_connector = MqttConnector(controlData, config_entry.data["country"], devices)
     mqtt_connector.connect()
     while mqtt_connector.client_connected is False:
         await asyncio.sleep(0.1)
@@ -46,7 +46,7 @@ async def async_setup_entry(
     for device in devices:
         if device.wiringType == 0:
             continue
-        light = MyRGBLight(config_entry, device, mqtt_connector)
+        light = HaoDengLight(config_entry, device, mqtt_connector)
         lights.append(light)
 
     add_entities(lights)
@@ -55,7 +55,7 @@ async def async_setup_entry(
     return True
 
 
-class MyRGBLight(LightEntity):
+class HaoDengLight(LightEntity):
     def __init__(
         self, config_entry: ConfigEntry, device: Device, mqtt_connector: MqttConnector
     ):
@@ -68,21 +68,24 @@ class MyRGBLight(LightEntity):
         self._mesh_id = device.meshAddress
         self._is_on = False
         self._rgb_color = (255, 0, 0)  # Initial color
-        self._attr_supported_color_modes = {
+        self._attr_supported_color_modes = [
             ColorMode.RGB,
             ColorMode.COLOR_TEMP,
-            ColorMode.BRIGHTNESS,
-            ColorMode.ONOFF,
-        }
-        self._attr_color_mode = ColorMode.RGB
+            # ColorMode.BRIGHTNESS,
+            # ColorMode.ONOFF,
+        ]
+        self._attr_color_mode = ColorMode.UNKNOWN
         self._brightness = 255
         self._attr_should_poll = False
         self._ignore_next_update = False
         self._last_update = 0
 
+        self._attr_max_color_temp_kelvin = 6535
+        self._attr_min_color_temp_kelvin = 2000
+
         def update_light(a, d):
             if a == self._mesh_id:
-                _LOGGER.info("Received update for Light %s", self._attr_name)
+                # _LOGGER.info("Received update for Light %s", self._attr_name)
                 self.update_light(d)
 
         mqtt_connector.subscribe(update_light)
@@ -126,7 +129,7 @@ class MyRGBLight(LightEntity):
         # the correct color. We should really only update this way
         # if the new color was created outside of Home Assistant.
         # In this case, at least we'll have something close in HA.
-        _LOGGER.info("Update_light %s: %s %s", self._attr_name, repr(rgb), self._is_on)
+        # _LOGGER.info("Update_light %s: %s %s", self._attr_name, repr(rgb), self._is_on)
         if (time.time() - self._last_update) < 2:
             _LOGGER.info("Skipping update, too soon after we issued a command")
             return  # We just updated the light, this is probably just the echo of that.
@@ -152,7 +155,7 @@ class MyRGBLight(LightEntity):
 
     async def async_turn_on(self, **kwargs) -> None:
         """Turn the light on."""
-        _LOGGER.info("TURN ON %s", self._attr_name)
+        # _LOGGER.info("TURN ON %s", self._attr_name)
         self._is_on = True
         # self._ignore_next_update = True
         self._last_update = time.time()
@@ -210,7 +213,7 @@ class MyRGBLight(LightEntity):
 
     async def async_turn_off(self, **kwargs) -> None:
         """Turn the light off."""
-        _LOGGER.info("TURN OFF ASYNC %s", self._attr_name)
+        # _LOGGER.info("TURN OFF ASYNC %s", self._attr_name)
         self._is_on = False
         self.async_write_ha_state()
         await self._mqtt_connector.turn_off(self._mesh_id)
@@ -219,7 +222,7 @@ class MyRGBLight(LightEntity):
 
     async def just_turn_on(self) -> None:
         """Turn the light off."""
-        _LOGGER.info("JUST TURN ON %s", self._attr_name)
+        # _LOGGER.info("JUST TURN ON %s", self._attr_name)
         self._is_on = True
         self.async_write_ha_state()
         await self._mqtt_connector.turn_on(self._mesh_id)
@@ -235,3 +238,7 @@ class MyRGBLight(LightEntity):
     def brightness(self) -> int:
         """Return the brightness of this light between 0..255."""
         return self._brightness
+
+    @property
+    def color_temp(self) -> int:
+        return self._attr_color_temp_kelvin

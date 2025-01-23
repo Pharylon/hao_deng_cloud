@@ -11,7 +11,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.components.light import LightEntity
 
 from .const import DOMAIN
-from .light import MyRGBLight
+from .light import HaoDengLight
 
 PLATFORMS = [LIGHT_DOMAIN, SENSOR_DOMAIN]
 
@@ -26,7 +26,5 @@ async def async_setup(hass, config) -> bool:
 
 async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:
     """Set up the light platform."""
-
-    await hass.config_entries.async_forward_entry_setup(config_entry, "light")
-
+    await hass.config_entries.async_forward_entry_setups(config_entry, ["light"])
     return True

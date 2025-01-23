@@ -39,6 +39,7 @@ class Device:
     deviceType: int
     controlType: int
     wiringType: int
+    groups: list[int]
 
     def __init__(self, json) -> None:
         """Initialize."""
@@ -51,3 +52,13 @@ class Device:
         self.deviceType = json["deviceType"]
         self.controlType = json["controlType"]
         self.wiringType = json["wiringType"]
+        self.groups = [
+            json["group1ID"],
+            json["group2ID"],
+            json["group3ID"],
+            json["group4ID"],
+            json["group5ID"],
+            json["group6ID"],
+            json["group7ID"],
+            json["group8ID"],
+        ]
