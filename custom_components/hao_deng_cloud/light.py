@@ -13,6 +13,7 @@ from homeassistant.components.light import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN
@@ -240,5 +241,50 @@ class HaoDengLight(LightEntity):
         return self._brightness
 
     @property
-    def color_temp(self) -> int:
+    def color_temp_kelvin(self) -> int:
+        """return color temp in kelvin."""
         return self._attr_color_temp_kelvin
+
+    @property
+    def unique_id(self):
+        """Return the unique ID of the light."""
+        return self._attr_unique_id
+
+    @property
+    def name(self):
+        """Return the name of the light."""
+        return self._attr_name
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return the device info."""
+        return DeviceInfo(
+            identifiers={
+                # Serial numbers are unique identifiers within a specific domain
+                ("hao_deng_cloud", self._mesh_id)
+            },
+            name=self.name,
+            manufacturer="Hao Deng",
+            model="Hao Deng Light",
+            sw_version="1.0.0",
+            # Optional: If your device is connected via a hub/bridge, link it here
+            # via_device=(DOMAIN, self.api.bridge_id),
+        )
+
+    @property
+    def supported_color_modes(self) -> set[ColorMode]:
+        """Return the supported color modes."""
+        return self._attr_supported_color_modes
+
+    @property
+    def color_mode(self) -> ColorMode:
+        """Return the current color mode."""
+        return self._attr_color_mode
+
+    # def can_set_color(self):
+    #     """Return true if light can set color by any means."""
+    #     return True
+
+    # def can_set_temp(self):
+    #     """Return true if light can set color temp."""
+    #     return True
