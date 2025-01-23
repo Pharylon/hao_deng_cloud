@@ -6,9 +6,14 @@
 Control your Hao Deng Lights mesh lights from Home Assistant! This integration allows you to
 control the above lights that you'd normally use through the Hao Deng App.
 
-Note that this integration does require the wifi bridge for your lights (it does not use Bluetooth).
+## Important Notes
 
-## Install with HACS (recommended)
+* This integration is in beta. Please open an issue if you have any problems!
+* This integration uses the cloud. If you don't have a wifi bridge, this won't work (ie, if you can control your lights with the Hao Deng app when you're away from home, you're good. If you have to be at your house to use it, you're not good)
+* As of right now, lights are only read in on server start. So when you add or modify lights (including adding them to groups) they will not be automatically updated and you'll need to restart home assistant (this is definitely a feature coming, but we're in beta right now!)
+* The Magic Cloud API doesn't seem to be able to handle more than 5 or so light updates at a time. This can make the lights stutter out of sync when updating a lot at once (I, personally, have 16 of these in my Great Room so I've really noticed!). To get around this issue, use the Hao Deng app to add your lights to groups that mirror the groups and rooms in your home. This allows the integration to "batch" those lights in a single group and makes everything flow better. For insance, I have a light group in Home Assisstant for my 16 Great Room lights. I put all those lights in a group in the Hao Deng app as well, and now they can be controlled in sync much better!
+
+## Installation with HACS (recommended)
 Do you have [HACS](https://hacs.xyz/) installed?
 1. Add **Hao Deng Cloud Component** as custom repository.
    1. Go to: `HACS` -> `Integrations` -> Click menu in right top -> Custom repositories
@@ -38,10 +43,11 @@ Do you have [HACS](https://hacs.xyz/) installed?
 
 ## Troubleshooting
 **This integration requires the cloud**
-1. Make sure it works through the Hao Deng app (this integration does not work unless you can control your lights through that app)
+1. Make sure it works through the Hao Deng app (this integration does not work unless you can control your lights through that app) when bluetooth is off, or you're out of bluetooth range of your lights
 2. Make sure your country code is correct
 3. Make sure you have the newest version of this integration installed
-4. Before submitting an issue, add `custom_components.hao_deng_cloud: debug` to the `logger` config in you `configuration.yaml`:
+4. Restart your server once if you've made any chages to your lights recently
+5. Before submitting an issue, add `custom_components.hao_deng_cloud: debug` to the `logger` config in you `configuration.yaml`:
 
 ```yaml
 logger:
