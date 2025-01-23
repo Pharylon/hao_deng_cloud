@@ -5,6 +5,7 @@ import math
 import time
 
 from homeassistant.components.light import (
+    _DEPRECATED_ATTR_KELVIN,
     ATTR_BRIGHTNESS,
     ATTR_RGB_COLOR,
     ATTR_COLOR_TEMP_KELVIN,
@@ -160,6 +161,11 @@ class HaoDengLight(LightEntity):
         self._is_on = True
         # self._ignore_next_update = True
         self._last_update = time.time()
+        if _DEPRECATED_ATTR_KELVIN in kwargs:
+            deprecated_color_temp = kwargs[ATTR_COLOR_TEMP_KELVIN]
+            _LOGGER.info("Deprecated color temp %s", deprecated_color_temp)
+        if ATTR_BRIGHTNESS in kwargs:
+            self._brightness = kwargs[ATTR_BRIGHTNESS]
         if ATTR_RGB_COLOR in kwargs:
             self._attr_color_mode = ColorMode.RGB
             normalized_colors = self.normalize_colors(
@@ -169,7 +175,11 @@ class HaoDengLight(LightEntity):
                 self._brightness,
             )
             self._rgb_color = normalized_colors
-        elif ATTR_BRIGHTNESS in kwargs:
+        elif (
+            ATTR_BRIGHTNESS in kwargs
+            and ATTR_COLOR_TEMP_KELVIN not in kwargs
+            and ATTR_RGB_COLOR not in kwargs
+        ):
             self._brightness = kwargs[ATTR_BRIGHTNESS]
             _LOGGER.info(
                 "BRIGTHNESS %s: %s", self._attr_name, repr(kwargs[ATTR_BRIGHTNESS])
@@ -184,7 +194,7 @@ class HaoDengLight(LightEntity):
             else:
                 self.async_write_ha_state()
                 await self._mqtt_connector.set_color_temp(
-                    self._mesh_id, self._attr_color_temp, self._brightness
+                    self._mesh_id, self._attr_color_temp_kelvin, self._brightness
                 )
                 return
         elif ATTR_COLOR_TEMP_KELVIN in kwargs:

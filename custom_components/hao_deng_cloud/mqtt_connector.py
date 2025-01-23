@@ -123,10 +123,14 @@ class MqttConnector:
             proportion = (color_temp - 2000) / (6535 - 2000)
             # Scale the proportion to the output range (0-100)
             translated_number = proportion * 100
-            hex_value = f"{int(translated_number):02x}"
-            brightness_value = f"{int(math.ceil(brigthness * 64 / 255)):02x}"
+            hex_value = f"{int(translated_number):02x}".upper()
+            _LOGGER.info("BRIGHTNESS_RAW %s", brigthness)
+            brightness_percent = int(math.ceil(brigthness * 100 / 255))
+            _LOGGER.info("BRIGHTNESS Percent %s", brightness_percent)
+            brightness_hexe = f"{brightness_percent:02x}".upper()
+            _LOGGER.info("BRIGHTNESS hex %s", brightness_hexe)
             payload = MqttLightPayload(
-                deviceId, "E2", f"0562{hex_value}{brightness_value}0000000200"
+                deviceId, "E2", f"0562{hex_value}{brightness_hexe}0000000200"
             )
             await self._add_to_queue(payload)
 
