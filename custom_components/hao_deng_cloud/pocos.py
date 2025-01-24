@@ -66,11 +66,13 @@ class Device:
 
 
 class ExternalColorData:
-    isRgb: bool
-    rgb: list[int]
+    isHsv: bool
+    hsv: list[int]
     colorTempBrightness: list[int]
 
-    def __init__(self, isRgb: bool, rgb: list[int], colorTempBrightness: list[int]):
-        self.isRgb = isRgb
-        self.rgb = rgb
+    def __init__(
+        self, isHsl: bool, hsv: list[int], colorTempBrightness: list[int]
+    ) -> None:
+        self.isHsv = isHsl
+        self.hsv = hsv
         self.colorTempBrightness = colorTempBrightness

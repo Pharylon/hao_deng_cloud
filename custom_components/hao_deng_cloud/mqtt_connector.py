@@ -90,7 +90,7 @@ class MqttConnector:
         mqttc.loop_start()
 
     async def set_color(self, deviceId: int, red: int, green: int, blue: int):
-        _LOGGER.info("SET COLOR")
+        _LOGGER.info("SET COLOR for %s: %s %s %s", deviceId, red, green, blue)
         if red > 255 or green > 255 or blue > 255 or red < 0 or green < 0 or blue < 0:
             _LOGGER.error("Invalid RGB values")
             return
@@ -118,17 +118,14 @@ class MqttConnector:
     async def set_color_temp(self, deviceId: int, color_temp: int, brigthness: int):
         """Set color temperature of light."""
         color_temp = color_temp or 5000
-        if 2000 <= color_temp <= 6535:
+        if 2500 <= color_temp <= 6535:
             # Calculate the proportion of the input number within its range
-            proportion = (color_temp - 2000) / (6535 - 2000)
+            proportion = (color_temp - 2500) / (6535 - 2500)
             # Scale the proportion to the output range (0-100)
             translated_number = proportion * 100
             hex_value = f"{int(translated_number):02x}".upper()
-            _LOGGER.info("BRIGHTNESS_RAW %s", brigthness)
             brightness_percent = int(math.ceil(brigthness * 100 / 255))
-            _LOGGER.info("BRIGHTNESS Percent %s", brightness_percent)
             brightness_hexe = f"{brightness_percent:02x}".upper()
-            _LOGGER.info("BRIGHTNESS hex %s", brightness_hexe)
             payload = MqttLightPayload(
                 deviceId, "E2", f"0562{hex_value}{brightness_hexe}0000000200"
             )
@@ -137,34 +134,32 @@ class MqttConnector:
     def _convert_notification_to_color_temp(self, data: str) -> ExternalColorData:
         colorTemp_hex = data[6:8]
         colorTemp_percent = int(colorTemp_hex, 16) / 100
-        output_range = 6535 - 2000
-        color_temp = int(colorTemp_percent * output_range + 2000)
+        output_range = 6535 - 2500
+        color_temp = int(colorTemp_percent * output_range + 2500)
         brightness = data[2:4]
         bright_percent = int(brightness, 16) / 100
-        _LOGGER.info("CTemp Brightness: %s %s", brightness, bright_percent)
-        _LOGGER.info(
-            "Color Temp: %s %s %s", colorTemp_hex, colorTemp_percent, color_temp
-        )
         return ExternalColorData(False, None, [color_temp, bright_percent])
 
     def _convert_notification_data_to_color_data(self, data: str) -> ExternalColorData:
-        _LOGGER.info("Color Data %s", data)
-        saturation = data[4:6]
-        saturation_percent = int(saturation, 16) / 63
-        if saturation_percent > 1:
-            return self._convert_notification_to_color_temp(data)
-        hue = data[6:8]
-        hue_percent = int(hue, 16) / 255
-        hue_360 = 360 * hue_percent
-        _LOGGER.info("SATURATION %s", saturation_percent)
-        brightness = data[2:4]
-        bright_percent = int(brightness, 16) / 100 / 2
-        _LOGGER.info("Brightness_percent %s %s", brightness, bright_percent)
-        _LOGGER.info("Hue percent %s %s", hue, hue_percent)
-        if saturation_percent == 0 or bright_percent == 0:
-            return ExternalColorData(True, [0, 0, 0], [0, 0])
-        rgb = hsl_to_rgb(hue_360, saturation_percent, bright_percent)
-        return ExternalColorData(True, rgb, None)
+        try:
+            saturation = data[4:6]
+            saturation_percent = int(saturation, 16) / 63
+            if saturation_percent > 1:
+                return self._convert_notification_to_color_temp(data)
+            hue = data[6:8]
+            hue_percent = int(hue, 16) / 255
+            hue_360 = 360 * hue_percent
+            brightness = data[2:4]
+            bright_percent = int(brightness, 16) / 100
+            _LOGGER.info("Incoming Bright %s %s", brightness, bright_percent)
+            if saturation_percent == 0 or bright_percent == 0:
+                return ExternalColorData(True, [0, 0, 0], [0, 0])
+            # rgb = hsl_to_rgb(hue_360, saturation_percent, bright_percent)
+            return ExternalColorData(
+                True, [hue_360, saturation_percent, bright_percent], None
+            )
+        except Exception as e:
+            _LOGGER.error(e)
 
     def subscribe(self, callback):
         self.subscriptions.append(callback)
@@ -230,11 +225,11 @@ class MqttConnector:
                         data_group
                     )
                     while len(final_paylods) > 0:
-                        _LOGGER.info("Final Payload Length %s", len(final_paylods))
+                        # _LOGGER.info("Final Payload Length %s", len(final_paylods))
                         first_three = final_paylods[:3]
                         for p in first_three:
                             payloadJson = json.dumps(p.__dict__)
-                            _LOGGER.info("Sending payload for id %s", p.dstAdr)
+                            # _LOGGER.info("Sending payload for id %s", p.dstAdr)
                             self.client.publish(
                                 f"/{self.software.productKey}/{self.software.deviceName}/control",
                                 payloadJson,
@@ -243,7 +238,7 @@ class MqttConnector:
                         await asyncio.sleep(__SLEEP_TIME__)
 
     async def _add_to_queue(self, payload: MqttLightPayload):
-        _LOGGER.info("Queueing %s ", payload.dstAdr)
+        # _LOGGER.info("Queueing %s ", payload.dstAdr)
         async with lock:
             self._queue.append(payload)
         # Wait a very short period to see if other requests get put in the queue
