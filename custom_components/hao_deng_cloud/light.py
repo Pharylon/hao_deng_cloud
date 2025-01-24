@@ -19,7 +19,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN
 from .mqtt_connector import MqttConnector
-from .pocos import Device
+from .pocos import Device, ExternalColorData
 from .rest_api_connector import RestApiConnector
 from .color_helper import get_rgb_distance
 
@@ -77,7 +77,7 @@ class HaoDengLight(LightEntity):
             # ColorMode.ONOFF,
         ]
         self._attr_color_mode = ColorMode.UNKNOWN
-        self._brightness = 255
+        self._attr_brightness = 255
         self._attr_should_poll = False
         self._ignore_next_update = False
         self._last_update = 0
@@ -123,8 +123,7 @@ class HaoDengLight(LightEntity):
             normalized.append(color)
         return normalized
 
-    def update_light(self, rgb: tuple[int, int, int]):
-        """Fetch new state data for this light."""
+    def _update_light_rgb(self, color_data: ExternalColorData):
         # I haven't been able to figure out the logic that exactly
         # converts their HSL-ish data into real RGB. So if it's
         # "close enough" we don't udpate, becuase we already have
@@ -135,25 +134,48 @@ class HaoDengLight(LightEntity):
         if (time.time() - self._last_update) < 2:
             _LOGGER.info("Skipping update, too soon after we issued a command")
             return  # We just updated the light, this is probably just the echo of that.
-        if rgb[0] == 0 and rgb[1] == 0 and rgb[2] == 0:
+        if color_data.rgb[0] == 0 and color_data.rgb[1] == 0 and color_data.rgb[2] == 0:
             self._is_on = False
             self.schedule_update_ha_state()
 
             return
         rgb_distance = get_rgb_distance(
-            [
-                self._rgb_color[0],
-                self._rgb_color[1],
-                self._rgb_color[2],
-            ],
-            rgb,
+            [self._rgb_color[0], self._rgb_color[1], self._rgb_color[2]],
+            color_data.rgb,
         )
         if rgb_distance < 50:  # the color is 'close enough', we don't need to update
             return
-        _LOGGER.info("UPDATING ID %s from Hao Deng to %s", self._attr_name, repr(rgb))
+        _LOGGER.info(
+            "UPDATING ID %s from Hao Deng to rgb %s",
+            self._attr_name,
+            repr(color_data.__dict__),
+        )
         self._is_on = True
-        self._rgb_color = rgb
+        self._rgb_color = color_data.rgb
+        self._attr_color_mode = ColorMode.RGB
         self.schedule_update_ha_state()
+
+    def _update_light_color_temp(self, color_data: ExternalColorData):
+        self._attr_color_mode = ColorMode.COLOR_TEMP
+        self._attr_color_temp_kelvin = color_data.colorTempBrightness[0]
+        self._is_on = color_data.colorTempBrightness[1] > 0
+        _LOGGER.info("Brightness is %s", color_data.colorTempBrightness[1])
+        self._attr_brightness = min(
+            math.ceil(color_data.colorTempBrightness[1] * 255), 255
+        )
+        _LOGGER.info("Brightness is ATTR %s", self._attr_brightness)
+
+        self.schedule_update_ha_state()
+
+    def update_light(self, color_data: ExternalColorData):
+        """Fetch new state data for this light."""
+        if (time.time() - self._last_update) < 2:
+            _LOGGER.info("Skipping update, too soon after we issued a command")
+            return
+        if color_data.isRgb:
+            self._update_light_rgb(color_data)
+        else:
+            self._update_light_color_temp(color_data)
 
     async def async_turn_on(self, **kwargs) -> None:
         """Turn the light on."""
@@ -161,18 +183,15 @@ class HaoDengLight(LightEntity):
         self._is_on = True
         # self._ignore_next_update = True
         self._last_update = time.time()
-        if _DEPRECATED_ATTR_KELVIN in kwargs:
-            deprecated_color_temp = kwargs[ATTR_COLOR_TEMP_KELVIN]
-            _LOGGER.info("Deprecated color temp %s", deprecated_color_temp)
         if ATTR_BRIGHTNESS in kwargs:
-            self._brightness = kwargs[ATTR_BRIGHTNESS]
+            self._attr_brightness = kwargs[ATTR_BRIGHTNESS]
         if ATTR_RGB_COLOR in kwargs:
             self._attr_color_mode = ColorMode.RGB
             normalized_colors = self.normalize_colors(
                 kwargs[ATTR_RGB_COLOR][0],
                 kwargs[ATTR_RGB_COLOR][1],
                 kwargs[ATTR_RGB_COLOR][2],
-                self._brightness,
+                self._attr_brightness,
             )
             self._rgb_color = normalized_colors
         elif (
@@ -180,7 +199,9 @@ class HaoDengLight(LightEntity):
             and ATTR_COLOR_TEMP_KELVIN not in kwargs
             and ATTR_RGB_COLOR not in kwargs
         ):
-            self._brightness = kwargs[ATTR_BRIGHTNESS]
+            _LOGGER.info("Just setting brigthness")
+            self._attr_brightness = kwargs[ATTR_BRIGHTNESS]
+            self.async_write_ha_state()
             _LOGGER.info(
                 "BRIGTHNESS %s: %s", self._attr_name, repr(kwargs[ATTR_BRIGHTNESS])
             )
@@ -188,13 +209,12 @@ class HaoDengLight(LightEntity):
                 base_colors = self.get_base_colors(self._rgb_color)
                 new_rgb = []
                 for color in base_colors:
-                    color = color * self._brightness / 255
+                    color = color * self._attr_brightness / 255
                     new_rgb.append(color)
                 self._rgb_color = new_rgb
             else:
-                self.async_write_ha_state()
                 await self._mqtt_connector.set_color_temp(
-                    self._mesh_id, self._attr_color_temp_kelvin, self._brightness
+                    self._mesh_id, self._attr_color_temp_kelvin, self._attr_brightness
                 )
                 return
         elif ATTR_COLOR_TEMP_KELVIN in kwargs:
@@ -207,7 +227,7 @@ class HaoDengLight(LightEntity):
             )
             self.async_write_ha_state()
             await self._mqtt_connector.set_color_temp(
-                self._mesh_id, kwargs[ATTR_COLOR_TEMP_KELVIN], self._brightness
+                self._mesh_id, kwargs[ATTR_COLOR_TEMP_KELVIN], self._attr_brightness
             )
             return
         else:
@@ -248,7 +268,8 @@ class HaoDengLight(LightEntity):
     @property
     def brightness(self) -> int:
         """Return the brightness of this light between 0..255."""
-        return self._brightness
+        _LOGGER.info("Reporting brightness %s", self._attr_brightness)
+        return self._attr_brightness
 
     @property
     def color_temp_kelvin(self) -> int:
@@ -281,15 +302,15 @@ class HaoDengLight(LightEntity):
             # via_device=(DOMAIN, self.api.bridge_id),
         )
 
-    @property
-    def supported_color_modes(self) -> set[ColorMode]:
-        """Return the supported color modes."""
-        return self._attr_supported_color_modes
+    # @property
+    # def supported_color_modes(self) -> set[ColorMode]:
+    #     """Return the supported color modes."""
+    #     return self._attr_supported_color_modes
 
-    @property
-    def color_mode(self) -> ColorMode:
-        """Return the current color mode."""
-        return self._attr_color_mode
+    # @property
+    # def color_mode(self) -> ColorMode:
+    #     """Return the current color mode."""
+    #     return self._attr_color_mode
 
     # def can_set_color(self):
     #     """Return true if light can set color by any means."""

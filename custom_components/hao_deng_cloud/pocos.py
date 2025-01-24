@@ -52,7 +52,7 @@ class Device:
         self.deviceType = json["deviceType"]
         self.controlType = json["controlType"]
         self.wiringType = json["wiringType"]
-        self.groups = [
+        groups = [
             json["group1ID"],
             json["group2ID"],
             json["group3ID"],
@@ -62,3 +62,15 @@ class Device:
             json["group7ID"],
             json["group8ID"],
         ]
+        self.groups = [x for x in groups if x > 0]
+
+
+class ExternalColorData:
+    isRgb: bool
+    rgb: list[int]
+    colorTempBrightness: list[int]
+
+    def __init__(self, isRgb: bool, rgb: list[int], colorTempBrightness: list[int]):
+        self.isRgb = isRgb
+        self.rgb = rgb
+        self.colorTempBrightness = colorTempBrightness

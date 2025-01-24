@@ -8,7 +8,7 @@ import paho.mqtt.client as mqtt
 
 from .color_helper import hsl_to_rgb
 from .const import MAGICHUE_COUNTRY_SERVERS
-from .pocos import Device, MqttControlData, MqttLightPayload
+from .pocos import Device, MqttControlData, MqttLightPayload, ExternalColorData
 
 # The callback for when a PUBLISH message is received from the server.
 
@@ -73,8 +73,8 @@ class MqttConnector:
             for d in data:
                 # _LOGGER.info("ON_MESSAGE: A: %d, D: %s", d["a"], d["d"])
                 for s in self.subscriptions:
-                    rgb = self.convert_notification_data_to_rgb(d["d"])
-                    s(d["a"], rgb)
+                    color_tuple = self._convert_notification_data_to_color_data(d["d"])
+                    s(d["a"], color_tuple)
 
         mqttc = mqtt.Client(uuid.uuid4().hex)
         mqttc.on_connect = on_connect
@@ -134,18 +134,37 @@ class MqttConnector:
             )
             await self._add_to_queue(payload)
 
-    def convert_notification_data_to_rgb(self, data: str) -> tuple[int, int, int]:
-        hue = data[6:8]
-        hue_percent = int(hue, 16) / 255
-        hue_percent = int(hue, 16) / 255
-        hue_360 = 360 * hue_percent
+    def _convert_notification_to_color_temp(self, data: str) -> ExternalColorData:
+        colorTemp_hex = data[6:8]
+        colorTemp_percent = int(colorTemp_hex, 16) / 100
+        output_range = 6535 - 2000
+        color_temp = int(colorTemp_percent * output_range + 2000)
+        brightness = data[2:4]
+        bright_percent = int(brightness, 16) / 100
+        _LOGGER.info("CTemp Brightness: %s %s", brightness, bright_percent)
+        _LOGGER.info(
+            "Color Temp: %s %s %s", colorTemp_hex, colorTemp_percent, color_temp
+        )
+        return ExternalColorData(False, None, [color_temp, bright_percent])
+
+    def _convert_notification_data_to_color_data(self, data: str) -> ExternalColorData:
+        _LOGGER.info("Color Data %s", data)
         saturation = data[4:6]
         saturation_percent = int(saturation, 16) / 63
+        if saturation_percent > 1:
+            return self._convert_notification_to_color_temp(data)
+        hue = data[6:8]
+        hue_percent = int(hue, 16) / 255
+        hue_360 = 360 * hue_percent
+        _LOGGER.info("SATURATION %s", saturation_percent)
         brightness = data[2:4]
         bright_percent = int(brightness, 16) / 100 / 2
+        _LOGGER.info("Brightness_percent %s %s", brightness, bright_percent)
+        _LOGGER.info("Hue percent %s %s", hue, hue_percent)
         if saturation_percent == 0 or bright_percent == 0:
-            return (0, 0, 0)
-        return hsl_to_rgb(hue_360, saturation_percent, bright_percent)
+            return ExternalColorData(True, [0, 0, 0], [0, 0])
+        rgb = hsl_to_rgb(hue_360, saturation_percent, bright_percent)
+        return ExternalColorData(True, rgb, None)
 
     def subscribe(self, callback):
         self.subscriptions.append(callback)
