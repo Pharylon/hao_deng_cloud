@@ -220,7 +220,7 @@ class MqttConnector:
                     final_payloads.append(p)
         return final_payloads
 
-    def _send_queue(self):
+    async def _send_queue(self):
         if len(self._queue) > 0:
             grouped_by_op_code = self._group_payloads_by_op_code(self._queue)
             for op_code_group in grouped_by_op_code.values():
@@ -240,6 +240,7 @@ class MqttConnector:
                                 payloadJson,
                             )
                         del final_paylods[:3]
+                        await asyncio.sleep(__SLEEP_TIME__)
 
     async def _add_to_queue(self, payload: MqttLightPayload):
         _LOGGER.info("Queueing %s ", payload.dstAdr)
@@ -248,6 +249,6 @@ class MqttConnector:
         # Wait a very short period to see if other requests get put in the queue
         await asyncio.sleep(0.01)
         async with lock:
-            self._send_queue()
+            await self._send_queue()
             self._queue = []
             await asyncio.sleep(__SLEEP_TIME__)
