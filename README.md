@@ -11,6 +11,7 @@ control the above lights that you'd normally use through the Hao Deng App. It mi
 * This integration uses the cloud. If you don't have a wifi bridge, this won't work (ie, if you can control your lights with the Hao Deng app when you're away from home, you're good. If you have to be at your house to use it, you're not good)
 * As of right now, lights are only read in on server start. So when you add or modify lights (including adding them to groups) they will not be automatically updated and you'll need to restart home assistant (this is definitely a feature coming, but we're in beta right now!)
 * The Magic Cloud API doesn't seem to be able to handle more than 5 or so light updates at a time. This can make the lights stutter out of sync when updating a lot at once (I, personally, have 16 of these in my Great Room so I've really noticed!). To get around this issue, use the Hao Deng app to add your lights to groups that mirror the groups and rooms in your home. This allows the integration to "batch" those lights in a single group and makes everything flow better. For insance, I have a light group in Home Assisstant for my 16 Great Room lights. I put all those lights in a group in the Hao Deng app as well, and now they can be controlled in sync much better!
+* If this integration works for you, please hit the star button up there. It gives me the warm fuzzies to know this code is benefitting other people! :)
 
 ## Installation with HACS (recommended)
 Do you have [HACS](https://hacs.xyz/) installed?
