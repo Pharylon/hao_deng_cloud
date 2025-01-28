@@ -4,7 +4,7 @@
 <img src="https://play-lh.googleusercontent.com/RlOT4SdOj8mLhbOJPwyv_VHqY72vAQzJdGq1YKB2yIufEPIKaYIk1SKODkOTZLnjBg" width="100" height="100"> <img src="https://m.media-amazon.com/images/I/414M0i-ED-L.jpg" width="100" height="100">
 
 Control your Hao Deng Lights mesh lights from Home Assistant! This integration allows you to
-control the above lights that you'd normally use through the Hao Deng App. It might work if you use the Magic Light BLE or Magic Home Pro app as well (see Troubleshooting).
+control the above lights that you'd normally use through the Hao Deng App. It might work if you use the Magic Light BLE or Magic Home Pro app as well (see below).
 ## Important Notes
 
 * This integration is in beta. Please open an issue if you have any problems!
@@ -46,7 +46,6 @@ Do you have [HACS](https://hacs.xyz/) installed?
 2. Make sure your country code is correct
 3. Make sure you have the newest version of this integration installed
 4. Restart your server once if you've made any chages to your lights recently
-5. If you use the Magic Light BLE or Magic Home Pro app, this *might* work. But I don't know, I don't use that app so I haven't tested it. If you use either of those apps and it doesn't work, drop me a line and I can take a look at adding support (and if you do use them and they do work, let me know so I can update this ReadMe!).
 6. Before submitting an issue, add `custom_components.hao_deng_cloud: debug` to the `logger` config in you `configuration.yaml`:
 
 ```yaml
@@ -58,6 +57,10 @@ logger:
 Restart Home Assistant for logging to begin.<br/>
 Logs can be found under Settings - System - Logs - Home Assistant Core<br/>
 Be sure to click **Load Full Logs** in order to retrieve all logs and submit those with any issues.<br/>
+
+## Magic Light BLE and Magic Home Pro Users
+
+If you use the Magic Light BLE or Magic Home Pro app, this *might* work. But I don't know, I don't use that app so I haven't tested it. My understand is they're all just reskinned versions of the Hao Deng app, but again, I have no first-hand experience using them. If you use either of those apps and this integration doesn't work, drop me a line and I can take a look at adding support. And if you *do* use them and they do work, let me know so I can update this ReadMe!
 
 ## Credits
 Credit to 
