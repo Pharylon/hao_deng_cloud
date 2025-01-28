@@ -233,6 +233,4 @@ class HaoDengLight(LightEntity):
             manufacturer="Hao Deng",
             model="Hao Deng Light",
             sw_version="1.0.0",
-            # Optional: If your device is connected via a hub/bridge, link it here
-            # via_device=(DOMAIN, self.api.bridge_id),
         )
