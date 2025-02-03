@@ -71,8 +71,13 @@ class ExternalColorData:
     colorTempBrightness: list[int]
 
     def __init__(
-        self, isHsl: bool, hsv: list[int], colorTempBrightness: list[int]
+        self,
+        isHsl: bool,
+        hsv: list[int],
+        colorTempBrightness: list[int],
+        isAvailable: bool,
     ) -> None:
+        self.isAvailable = isAvailable
         self.isHsv = isHsl
         self.hsv = hsv
         self.colorTempBrightness = colorTempBrightness

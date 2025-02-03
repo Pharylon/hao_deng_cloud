@@ -138,6 +138,8 @@ class HaoDengLight(LightEntity):
         # _LOGGER.info("Updating %s: %s ", self._attr_name, repr(color_data.__dict__))
         try:
             _LOGGER.info("Updating %s: %s ", self._attr_name, repr(color_data.__dict__))
+            if color_data.isAvailable is False:
+                return
             if (
                 time.time() - self._last_update < 2
                 and self._attr_color_mode != ColorMode.UNKNOWN

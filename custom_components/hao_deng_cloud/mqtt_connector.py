@@ -138,7 +138,9 @@ class MqttConnector:
         color_temp = int(colorTemp_percent * output_range + 2500)
         brightness = data[2:4]
         bright_percent = int(brightness, 16) / 100
-        return ExternalColorData(False, None, [color_temp, bright_percent])
+        return ExternalColorData(
+            False, None, [color_temp, bright_percent], data[0:2] != "00"
+        )
 
     def _convert_notification_data_to_color_data(self, data: str) -> ExternalColorData:
         try:
@@ -153,13 +155,17 @@ class MqttConnector:
             bright_percent = int(brightness, 16) / 100
             _LOGGER.info("Incoming Bright %s %s", brightness, bright_percent)
             if saturation_percent == 0 or bright_percent == 0:
-                return ExternalColorData(True, [0, 0, 0], [0, 0])
+                return ExternalColorData(True, [0, 0, 0], [0, 0], data[0:2] == "00")
             # rgb = hsl_to_rgb(hue_360, saturation_percent, bright_percent)
             return ExternalColorData(
-                True, [hue_360, saturation_percent, bright_percent], None
+                True,
+                [hue_360, saturation_percent, bright_percent],
+                None,
+                data[0:2] == "00",
             )
         except Exception as e:
             _LOGGER.error(e)
+            return ExternalColorData(False, [0, 0, 0], None, False)
 
     def subscribe(self, callback):
         self.subscriptions.append(callback)
@@ -224,18 +230,13 @@ class MqttConnector:
                     final_paylods: list[MqttLightPayload] = self._create_group_payloads(
                         data_group
                     )
-                    while len(final_paylods) > 0:
-                        # _LOGGER.info("Final Payload Length %s", len(final_paylods))
-                        first_three = final_paylods[:3]
-                        for p in first_three:
-                            payloadJson = json.dumps(p.__dict__)
-                            # _LOGGER.info("Sending payload for id %s", p.dstAdr)
-                            self.client.publish(
-                                f"/{self.software.productKey}/{self.software.deviceName}/control",
-                                payloadJson,
-                            )
-                        del final_paylods[:3]
-                        await asyncio.sleep(__SLEEP_TIME__)
+                    for p in final_paylods:
+                        payloadJson = json.dumps(p.__dict__)
+                        # _LOGGER.info("Sending payload for id %s", p.dstAdr)
+                        self.client.publish(
+                            f"/{self.software.productKey}/{self.software.deviceName}/control",
+                            payloadJson,
+                        )
 
     async def _add_to_queue(self, payload: MqttLightPayload):
         # _LOGGER.info("Queueing %s ", payload.dstAdr)
