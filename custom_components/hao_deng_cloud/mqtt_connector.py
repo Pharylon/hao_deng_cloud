@@ -6,7 +6,6 @@ import uuid
 
 import paho.mqtt.client as mqtt
 
-from .color_helper import hsl_to_rgb
 from .const import MAGICHUE_COUNTRY_SERVERS
 from .pocos import Device, MqttControlData, MqttLightPayload, ExternalColorData
 

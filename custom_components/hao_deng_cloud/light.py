@@ -22,7 +22,6 @@ from .const import DOMAIN
 from .mqtt_connector import MqttConnector
 from .pocos import Device, ExternalColorData
 from .rest_api_connector import RestApiConnector
-from .color_helper import get_rgb_distance
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -139,6 +138,10 @@ class HaoDengLight(LightEntity):
         try:
             _LOGGER.info("Updating %s: %s ", self._attr_name, repr(color_data.__dict__))
             if color_data.isAvailable is False:
+                _LOGGER.warning(
+                    "Update timestamp for %s is 00, light is unavailable",
+                    self._attr_name,
+                )
                 return
             if (
                 time.time() - self._last_update < 2
