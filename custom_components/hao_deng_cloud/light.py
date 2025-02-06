@@ -104,22 +104,22 @@ class HaoDengLight(LightEntity):
         return adjusted_colors
 
     def _update_hsv_values(self, color_data: ExternalColorData):
-        _LOGGER.info(
-            "Updating HSV of %s %s %s ",
-            color_data.hsv[0],
-            color_data.hsv[1],
-            color_data.hsv[2],
-        )
+        # _LOGGER.info(
+        #     "Updating HSV of %s %s %s ",
+        #     color_data.hsv[0],
+        #     color_data.hsv[1],
+        #     color_data.hsv[2],
+        # )
         if color_data.hsv[0] == 0 and color_data.hsv[1] == 0 and color_data.hsv[2] == 0:
             self._attr_is_on = False
             return
         # _LOGGER.info("%s is on", self._attr_name)
         self._attr_is_on = True
-        _LOGGER.info("New Bright  PRE %s", color_data.hsv[2])
+        # _LOGGER.info("New Bright  PRE %s", color_data.hsv[2])
         self._attr_brightness = color_data.hsv[2] * 255
         self._attr_hs_color = [color_data.hsv[0], color_data.hsv[1] * 100]
-        _LOGGER.info("New Bright %s", self._attr_brightness)
-        _LOGGER.info("New Hs %s", self._attr_hs_color)
+        # _LOGGER.info("New Bright %s", self._attr_brightness)
+        # _LOGGER.info("New Hs %s", self._attr_hs_color)
         self._attr_color_mode = ColorMode.HS
 
     def _update_light_color_temp(self, color_data: ExternalColorData):
@@ -135,11 +135,11 @@ class HaoDengLight(LightEntity):
     def _update_light(self, color_data: ExternalColorData):
         """Update light from fetched cloud data."""
         try:
-            _LOGGER.info(
-                "Received Update for %s: %s ",
-                self._attr_name,
-                repr(color_data.__dict__),
-            )
+            # _LOGGER.info(
+            #     "Received Update for %s: %s ",
+            #     self._attr_name,
+            #     repr(color_data.__dict__),
+            # )
             if (
                 color_data.isAvailable is False
                 and color_data.colorTempBrightness[0] == 2500
@@ -151,11 +151,12 @@ class HaoDengLight(LightEntity):
                 )
                 return
             if (
-                time.time() - self._last_update < 2
+                time.time() - self._last_update < 5
                 and self._attr_color_mode != ColorMode.UNKNOWN
             ):
-                _LOGGER.info("Skipping update, too soon after we issued a command")
+                # _LOGGER.info("Skipping update, too soon after we issued a command")
                 return
+            _LOGGER.info("Updating %s", self._attr_name)
             if color_data.isHsv:
                 self._update_hsv_values(color_data)
             else:
@@ -169,15 +170,15 @@ class HaoDengLight(LightEntity):
         brightness_scale_100 = brightness / 255
         rgb_float = colorsys.hsv_to_rgb(hs[0] / 365, hs[1] / 100, brightness_scale_100)
         rgb = [rgb_float[0] * 255, rgb_float[1] * 255, rgb_float[2] * 255]
-        _LOGGER.info(
-            "Convert HSL of %s %s %s to RGB of %s %s %s",
-            hs[0],
-            hs[1],
-            brightness,
-            rgb[0],
-            rgb[1],
-            rgb[2],
-        )
+        # _LOGGER.info(
+        #     "Convert HSL of %s %s %s to RGB of %s %s %s",
+        #     hs[0],
+        #     hs[1],
+        #     brightness,
+        #     rgb[0],
+        #     rgb[1],
+        #     rgb[2],
+        # )
         return rgb
 
     async def async_turn_on(self, **kwargs) -> None:
@@ -187,9 +188,9 @@ class HaoDengLight(LightEntity):
             self._attr_brightness = kwargs[ATTR_BRIGHTNESS]
         self._attr_brightness = self._attr_brightness or 255
         if ATTR_HS_COLOR in kwargs:
-            _LOGGER.info("Setting Color ON %s", repr(kwargs[ATTR_HS_COLOR]))
+            # _LOGGER.info("Setting Color ON %s", repr(kwargs[ATTR_HS_COLOR]))
             self._attr_color_mode = ColorMode.HS
-            _LOGGER.info("HS %s", kwargs[ATTR_HS_COLOR])
+            # _LOGGER.info("HS %s", kwargs[ATTR_HS_COLOR])
             self._attr_hs_color = kwargs[ATTR_HS_COLOR]
             rgb = self._hsv_to_rgb(self._attr_hs_color, self._attr_brightness)
             self.async_write_ha_state()

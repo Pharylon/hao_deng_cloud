@@ -15,8 +15,6 @@ _LOGGER = logging.getLogger(__name__)
 
 lock = asyncio.Lock()
 
-__SLEEP_TIME__ = 0.1
-
 
 def on_subscribe(client, userdata, mid, granted_qos):
     _LOGGER.info("Subscribed: %s %s", str(mid), str(granted_qos))
@@ -91,7 +89,7 @@ class MqttConnector:
         mqttc.loop_start()
 
     async def set_color(self, deviceId: int, red: int, green: int, blue: int):
-        _LOGGER.info("SET COLOR for %s: %s %s %s", deviceId, red, green, blue)
+        # _LOGGER.info("SET COLOR for %s: %s %s %s", deviceId, red, green, blue)
         if red > 255 or green > 255 or blue > 255 or red < 0 or green < 0 or blue < 0:
             _LOGGER.error("Invalid RGB values")
             return
@@ -243,23 +241,23 @@ class MqttConnector:
                         f"/{self.software.productKey}/{self.software.deviceName}/control",
                         payloadJson,
                     )
-                    await asyncio.sleep(__SLEEP_TIME__)
+                    await asyncio.sleep(0.1)
 
     async def _add_to_queue(self, payload: MqttLightPayload):
         # _LOGGER.info("Queueing %s ", payload.dstAdr)
         async with lock:
             self._queue.append(payload)
-        queue_length = len(self._queue)
+        # queue_length = len(self._queue)
         # Wait a very short period to see if other requests get put in the queue
         await asyncio.sleep(0.01)
-        new_queue_length = len(self._queue)
-        while queue_length != new_queue_length:
-            _LOGGER.info("Adding to queue. CUrrent length: %s", len(self._queue))
-            queue_length = new_queue_length
-            await asyncio.sleep(0.01)
-            new_queue_length = len(self._queue)
-        _LOGGER.info("Done making queue. CUrrent length: %s", len(self._queue))
+        # new_queue_length = len(self._queue)
+        # while queue_length != new_queue_length:
+        #     _LOGGER.info("Adding to queue. Current length: %s", len(self._queue))
+        #     queue_length = new_queue_length
+        #     await asyncio.sleep(0.01)
+        #     new_queue_length = len(self._queue)
+        # _LOGGER.info("Done making queue. CUrrent length: %s", len(self._queue))
         async with lock:
             await self._send_queue()
             self._queue = []
-            await asyncio.sleep(__SLEEP_TIME__)
+            _LOGGER.info("Cleared queue (length now %s)", len(self._queue))
