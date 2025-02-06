@@ -134,10 +134,17 @@ class HaoDengLight(LightEntity):
 
     def _update_light(self, color_data: ExternalColorData):
         """Update light from fetched cloud data."""
-        # _LOGGER.info("Updating %s: %s ", self._attr_name, repr(color_data.__dict__))
         try:
-            _LOGGER.info("Updating %s: %s ", self._attr_name, repr(color_data.__dict__))
-            if color_data.isAvailable is False:
+            _LOGGER.info(
+                "Received Update for %s: %s ",
+                self._attr_name,
+                repr(color_data.__dict__),
+            )
+            if (
+                color_data.isAvailable is False
+                and color_data.colorTempBrightness[0] == 2500
+                and color_data.colorTempBrightness[1] == 0
+            ):
                 _LOGGER.warning(
                     "Update timestamp for %s is 00, light is unavailable",
                     self._attr_name,

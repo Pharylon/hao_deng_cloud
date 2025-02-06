@@ -72,7 +72,9 @@ class MqttConnector:
             for d in data:
                 # _LOGGER.info("ON_MESSAGE: A: %d, D: %s", d["a"], d["d"])
                 for s in self.subscriptions:
-                    color_tuple = self._convert_notification_data_to_color_data(d["d"])
+                    color_tuple = self._convert_notification_data_to_color_data(
+                        d["d"], d["a"]
+                    )
                     s(d["a"], color_tuple)
 
         mqttc = mqtt.Client(uuid.uuid4().hex)
@@ -130,38 +132,51 @@ class MqttConnector:
             )
             await self._add_to_queue(payload)
 
-    def _convert_notification_to_color_temp(self, data: str) -> ExternalColorData:
+    def _convert_notification_to_color_temp(
+        self, data: str, id: int
+    ) -> ExternalColorData:
         colorTemp_hex = data[6:8]
         colorTemp_percent = int(colorTemp_hex, 16) / 100
         output_range = 6535 - 2500
         color_temp = int(colorTemp_percent * output_range + 2500)
         brightness = data[2:4]
         bright_percent = int(brightness, 16) / 100
-        return ExternalColorData(
+        ecd = ExternalColorData(
             False, None, [color_temp, bright_percent], data[0:2] != "00"
         )
+        # _LOGGER.info(
+        #     "%s - Converting notification of %s to %s", id, data, repr(ecd.__dict__)
+        # )
 
-    def _convert_notification_data_to_color_data(self, data: str) -> ExternalColorData:
+        return ecd
+
+    def _convert_notification_data_to_color_data(
+        self, data: str, id: int
+    ) -> ExternalColorData:
         try:
             saturation = data[4:6]
             saturation_percent = int(saturation, 16) / 63
             if saturation_percent > 1:
-                return self._convert_notification_to_color_temp(data)
+                return self._convert_notification_to_color_temp(data, id)
             hue = data[6:8]
             hue_percent = int(hue, 16) / 255
             hue_360 = 360 * hue_percent
             brightness = data[2:4]
             bright_percent = int(brightness, 16) / 100
-            _LOGGER.info("Incoming Bright %s %s", brightness, bright_percent)
+            # _LOGGER.info("Incoming Bright %s %s", brightness, bright_percent)
             if saturation_percent == 0 or bright_percent == 0:
                 return ExternalColorData(True, [0, 0, 0], [0, 0], data[0:2] == "00")
             # rgb = hsl_to_rgb(hue_360, saturation_percent, bright_percent)
-            return ExternalColorData(
+            ecd = ExternalColorData(
                 True,
                 [hue_360, saturation_percent, bright_percent],
                 None,
-                data[0:2] == "00",
+                data[0:2] != "00",
             )
+            # _LOGGER.info(
+            #     "%s - Converting notification of %s to %s", id, data, repr(ecd.__dict__)
+            # )
+            return ecd
         except Exception as e:
             _LOGGER.error(e)
             return ExternalColorData(False, [0, 0, 0], None, False)
@@ -186,25 +201,19 @@ class MqttConnector:
             grouped_by_op_code[p.opCode].append(p)
         return grouped_by_op_code
 
-    def _group_payloads_by_data(
-        self, payloads: list[MqttLightPayload]
-    ) -> dict[int, list[MqttLightPayload]]:
-        grouped_by_data = {}
-        for p in payloads:
-            if p.data not in grouped_by_data:
-                grouped_by_data[p.data] = []
-            grouped_by_data[p.data].append(p)
-        return grouped_by_data
-
     def _create_group_payloads(self, payloads: list[MqttLightPayload]):
         """Group all payloads by their group ID, so we can send the control message to the group instead of each individual device.
         Payloads should already have the same OpCode and Data at this stage.
         """  # noqa: D205
 
         final_payloads: list[MqttLightPayload] = []
+        _LOGGER.info("Payload len befor mess addresses: %s", len(payloads))
         mesh_addresses = [x.dstAdr for x in payloads]
+        _LOGGER.info("Mess addresses: %s", mesh_addresses)
         for group_id, group_addresses in self._groups.items():
+            _LOGGER.info("Group ID %s, group addresses: %s", group_id, group_addresses)
             if all(addr in mesh_addresses for addr in group_addresses):
+                _LOGGER.info("All %s", group_id)
                 group_payload = MqttLightPayload(
                     group_id, payloads[0].opCode, payloads[0].data
                 )
@@ -224,25 +233,32 @@ class MqttConnector:
         if len(self._queue) > 0:
             grouped_by_op_code = self._group_payloads_by_op_code(self._queue)
             for op_code_group in grouped_by_op_code.values():
-                grouped_by_data = self._group_payloads_by_data(op_code_group)
-                for data_group in grouped_by_data.values():
-                    final_paylods: list[MqttLightPayload] = self._create_group_payloads(
-                        data_group
+                final_paylods: list[MqttLightPayload] = self._create_group_payloads(
+                    op_code_group
+                )
+                for p in final_paylods:
+                    payloadJson = json.dumps(p.__dict__)
+                    _LOGGER.info("Sending payload for id %s", p.dstAdr)
+                    self.client.publish(
+                        f"/{self.software.productKey}/{self.software.deviceName}/control",
+                        payloadJson,
                     )
-                    for p in final_paylods:
-                        payloadJson = json.dumps(p.__dict__)
-                        # _LOGGER.info("Sending payload for id %s", p.dstAdr)
-                        self.client.publish(
-                            f"/{self.software.productKey}/{self.software.deviceName}/control",
-                            payloadJson,
-                        )
+                    await asyncio.sleep(__SLEEP_TIME__)
 
     async def _add_to_queue(self, payload: MqttLightPayload):
         # _LOGGER.info("Queueing %s ", payload.dstAdr)
         async with lock:
             self._queue.append(payload)
+        queue_length = len(self._queue)
         # Wait a very short period to see if other requests get put in the queue
         await asyncio.sleep(0.01)
+        new_queue_length = len(self._queue)
+        while queue_length != new_queue_length:
+            _LOGGER.info("Adding to queue. CUrrent length: %s", len(self._queue))
+            queue_length = new_queue_length
+            await asyncio.sleep(0.01)
+            new_queue_length = len(self._queue)
+        _LOGGER.info("Done making queue. CUrrent length: %s", len(self._queue))
         async with lock:
             await self._send_queue()
             self._queue = []
