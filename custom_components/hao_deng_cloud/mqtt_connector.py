@@ -259,6 +259,7 @@ class MqttConnector:
                             qos=1,
                         )
             self._ensure_queue_sent()
+            await asyncio.sleep(0.1)
 
     def _ensure_queue_sent(self):
         try:
