@@ -189,6 +189,16 @@ class MqttConnector:
             payloadJson,
         )
 
+    def _group_payloads_by_data(
+        self, payloads: list[MqttLightPayload]
+    ) -> dict[int, list[MqttLightPayload]]:
+        grouped_by_data = {}
+        for p in payloads:
+            if p.data not in grouped_by_data:
+                grouped_by_data[p.data] = []
+            grouped_by_data[p.data].append(p)
+        return grouped_by_data
+
     def _group_payloads_by_op_code(
         self, payloads: list[MqttLightPayload]
     ) -> dict[int, list[MqttLightPayload]]:
@@ -231,16 +241,18 @@ class MqttConnector:
         if len(self._queue) > 0:
             grouped_by_op_code = self._group_payloads_by_op_code(self._queue)
             for op_code_group in grouped_by_op_code.values():
-                final_paylods: list[MqttLightPayload] = self._create_group_payloads(
-                    op_code_group
-                )
-                for p in final_paylods:
-                    payloadJson = json.dumps(p.__dict__)
-                    _LOGGER.info("Sending payload for id %s", p.dstAdr)
-                    self.client.publish(
-                        f"/{self.software.productKey}/{self.software.deviceName}/control",
-                        payloadJson,
+                grouped_by_data = self._group_payloads_by_data(op_code_group)
+                for data_group in grouped_by_data.values():
+                    final_paylods: list[MqttLightPayload] = self._create_group_payloads(
+                        data_group
                     )
+                    for p in final_paylods:
+                        payloadJson = json.dumps(p.__dict__)
+                        # _LOGGER.info("Sending payload for id %s", p.dstAdr)
+                        self.client.publish(
+                            f"/{self.software.productKey}/{self.software.deviceName}/control",
+                            payloadJson,
+                        )
                     await asyncio.sleep(0.1)
 
     async def _add_to_queue(self, payload: MqttLightPayload):
