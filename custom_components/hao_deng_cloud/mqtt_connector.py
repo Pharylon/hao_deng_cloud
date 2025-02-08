@@ -35,7 +35,7 @@ class MqttConnector:
     ):
         self.subscriptions = []
         self._country_code = country_code
-        self._queue: list[MqttLightPayload] = []
+        self._queue: dict[str, MqttLightPayload] = {}
         self._update_timestamps = {}
         for x in controlData:
             if x.deviceType == "HARDWARE":
@@ -241,7 +241,7 @@ class MqttConnector:
 
     async def _send_queue(self):
         if len(self._queue) > 0:
-            grouped_by_op_code = self._group_payloads_by_op_code(self._queue)
+            grouped_by_op_code = self._group_payloads_by_op_code(self._queue.values())
             for op_code_group in grouped_by_op_code.values():
                 grouped_by_data = self._group_payloads_by_data(op_code_group)
                 for data_group in grouped_by_data.values():
@@ -267,11 +267,11 @@ class MqttConnector:
         except RuntimeError:  # 'RuntimeError: There is no current event loop...'
             loop = None
         if loop and loop.is_running():
-            loop.create_task(self._wait_and_retry_queue(self._queue))
+            loop.create_task(self._wait_and_retry_queue())
 
-    async def _wait_and_retry_queue(self, queue: list[MqttLightPayload]):
+    async def _wait_and_retry_queue(self):
         await asyncio.sleep(3)
-        for queue_item in queue:
+        for queue_item in self._queue.values():
             last_update = self._update_timestamps[queue_item.dstAdr]
             if time.time() - last_update > 5:
                 # We sent a upate, but didn't recieve a corresponding update from the broker, retry
@@ -291,7 +291,7 @@ class MqttConnector:
     async def _add_to_queue(self, payload: MqttLightPayload):
         # _LOGGER.info("Queueing %s ", payload.dstAdr)
         async with lock:
-            self._queue.append(payload)
+            self._queue.update({payload.dstAdr: payload})
         # queue_length = len(self._queue)
         # Wait a very short period to see if other requests get put in the queue
         await asyncio.sleep(0.01)
@@ -304,4 +304,4 @@ class MqttConnector:
         # _LOGGER.info("Done making queue. CUrrent length: %s", len(self._queue))
         async with lock:
             await self._send_queue()
-            self._queue = []
+            self._queue = {}
