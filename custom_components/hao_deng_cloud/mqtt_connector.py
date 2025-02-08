@@ -3,6 +3,7 @@ import json
 import logging
 import math
 import uuid
+import time
 
 import paho.mqtt.client as mqtt
 
@@ -35,6 +36,7 @@ class MqttConnector:
         self.subscriptions = []
         self._country_code = country_code
         self._queue: list[MqttLightPayload] = []
+        self._update_timestamps = {}
         for x in controlData:
             if x.deviceType == "HARDWARE":
                 self.hardware = x
@@ -74,6 +76,7 @@ class MqttConnector:
                         d["d"], d["a"]
                     )
                     s(d["a"], color_tuple)
+                    self._update_timestamps.update({d["a"]: time.time()})
 
         mqttc = mqtt.Client(uuid.uuid4().hex)
         mqttc.on_connect = on_connect
@@ -99,7 +102,7 @@ class MqttConnector:
             blue = blue - 1
         hexValue = f"{int(red):02x}{int(green):02x}{int(blue):02x}".upper()
         payload = MqttLightPayload(deviceId, "E2", f"0560{hexValue}00000200")
-        _LOGGER.info("Adding to que %s", payload.dstAdr)
+        # _LOGGER.info("Adding to que %s", payload.dstAdr)
         await self._add_to_queue(payload)
 
     async def turn_on(self, deviceId: int):
@@ -215,13 +218,12 @@ class MqttConnector:
         """  # noqa: D205
 
         final_payloads: list[MqttLightPayload] = []
-        _LOGGER.info("Payload len befor mesh addresses: %s", len(payloads))
+        # _LOGGER.info("Payload len befor mesh addresses: %s", len(payloads))
         mesh_addresses = [x.dstAdr for x in payloads]
-        _LOGGER.info("Mesh addresses: %s", mesh_addresses)
+        # _LOGGER.info("Mesh addresses: %s", mesh_addresses)
         for group_id, group_addresses in self._groups.items():
-            _LOGGER.info("Group ID %s, group addresses: %s", group_id, group_addresses)
+            # _LOGGER.info("Group ID %s, group addresses: %s", group_id, group_addresses)
             if all(addr in mesh_addresses for addr in group_addresses):
-                _LOGGER.info("All %s", group_id)
                 group_payload = MqttLightPayload(
                     group_id, payloads[0].opCode, payloads[0].data
                 )
@@ -248,13 +250,42 @@ class MqttConnector:
                     )
                     for p in final_paylods:
                         payloadJson = json.dumps(p.__dict__)
-                        # _LOGGER.info("Sending payload for id %s", p.dstAdr)
+                        _LOGGER.info(
+                            "Sending payload for id %s: %s", p.dstAdr, payloadJson
+                        )
                         self.client.publish(
                             f"/{self.software.productKey}/{self.software.deviceName}/control",
                             payloadJson,
                             qos=1,
                         )
-                    await asyncio.sleep(0.1)
+            self._ensure_queue_sent()
+
+    def _ensure_queue_sent(self):
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:  # 'RuntimeError: There is no current event loop...'
+            loop = None
+        if loop and loop.is_running():
+            loop.create_task(self._wait_and_retry_queue(self._queue))
+
+    async def _wait_and_retry_queue(self, queue: list[MqttLightPayload]):
+        await asyncio.sleep(3)
+        for queue_item in queue:
+            last_update = self._update_timestamps[queue_item.dstAdr]
+            if time.time() - last_update > 5:
+                # We sent a upate, but didn't recieve a corresponding update from the broker, retry
+                _LOGGER.warning(
+                    "Didn't get update for %s, resending", queue_item.dstAdr
+                )
+                payloadJson = json.dumps(queue_item.__dict__)
+                self.client.publish(
+                    f"/{self.software.productKey}/{self.software.deviceName}/control",
+                    payloadJson,
+                    qos=1,
+                )
+                await asyncio.sleep(0.1)
+            else:
+                _LOGGER.info("Light %s, updated after send", queue_item.dstAdr)
 
     async def _add_to_queue(self, payload: MqttLightPayload):
         # _LOGGER.info("Queueing %s ", payload.dstAdr)
@@ -273,4 +304,3 @@ class MqttConnector:
         async with lock:
             await self._send_queue()
             self._queue = []
-            _LOGGER.info("Cleared queue (length now %s)", len(self._queue))
