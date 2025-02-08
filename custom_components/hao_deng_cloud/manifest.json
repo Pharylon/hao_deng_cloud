@@ -12,5 +12,5 @@
         "paho-mqtt"
     ],
     "config_flow": true,
-    "version": "1.1.0"
+    "version": "1.3.0-beta-2"
   }

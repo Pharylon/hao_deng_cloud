@@ -215,9 +215,9 @@ class MqttConnector:
         """  # noqa: D205
 
         final_payloads: list[MqttLightPayload] = []
-        _LOGGER.info("Payload len befor mess addresses: %s", len(payloads))
+        _LOGGER.info("Payload len befor mesh addresses: %s", len(payloads))
         mesh_addresses = [x.dstAdr for x in payloads]
-        _LOGGER.info("Mess addresses: %s", mesh_addresses)
+        _LOGGER.info("Mesh addresses: %s", mesh_addresses)
         for group_id, group_addresses in self._groups.items():
             _LOGGER.info("Group ID %s, group addresses: %s", group_id, group_addresses)
             if all(addr in mesh_addresses for addr in group_addresses):
@@ -252,6 +252,7 @@ class MqttConnector:
                         self.client.publish(
                             f"/{self.software.productKey}/{self.software.deviceName}/control",
                             payloadJson,
+                            qos=1,
                         )
                     await asyncio.sleep(0.1)
 

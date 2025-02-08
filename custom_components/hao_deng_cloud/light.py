@@ -140,11 +140,7 @@ class HaoDengLight(LightEntity):
             #     self._attr_name,
             #     repr(color_data.__dict__),
             # )
-            if (
-                color_data.isAvailable is False
-                and color_data.colorTempBrightness[0] == 2500
-                and color_data.colorTempBrightness[1] == 0
-            ):
+            if color_data.isAvailable is False:
                 _LOGGER.warning(
                     "Update timestamp for %s is 00, light is unavailable",
                     self._attr_name,
@@ -164,7 +160,12 @@ class HaoDengLight(LightEntity):
             self._attr_available = True
             self.schedule_update_ha_state()
         except Exception as e:
-            _LOGGER.error(e)
+            _LOGGER.error(
+                "Error updating light %s with data %s. Error was %s",
+                self._attr_name,
+                repr(color_data.__dict__),
+                e,
+            )
 
     def _hsv_to_rgb(self, hs: tuple[float, float], brightness: float):
         brightness_scale_100 = brightness / 255
