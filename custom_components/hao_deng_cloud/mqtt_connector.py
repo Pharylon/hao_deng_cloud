@@ -6,6 +6,7 @@ import uuid
 import time
 
 import paho.mqtt.client as mqtt
+import paho.mqtt
 
 from .const import MAGICHUE_COUNTRY_SERVERS
 from .pocos import Device, MqttControlData, MqttLightPayload, ExternalColorData
@@ -78,7 +79,11 @@ class MqttConnector:
                     s(d["a"], color_tuple)
                     self._update_timestamps.update({d["a"]: time.time()})
 
-        mqttc = mqtt.Client(uuid.uuid4().hex)
+        mqttc: mqtt.Client
+        if paho.mqtt.__version__[0] > '1':
+            mqttc = mqtt.Client(mqtt.CallbackAPIVersion.VERSION1, uuid.uuid4().hex)
+        else:
+            mqttc = mqtt.Client(uuid.uuid4().hex)
         mqttc.on_connect = on_connect
         mqttc.on_message = on_message
         mqttc.on_subscribe = on_subscribe
