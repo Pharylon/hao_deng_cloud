@@ -124,7 +124,7 @@ class RestApiConnector:
                     resultJSON = (await response.json())[
                         "result"
                     ]  # Previous Code:  responseJSON = response.json()['result'] #Previous Code:
-                    print(resultJSON)
+                    _LOGGER.info("resultJSON: %s", resultJSON)
                     self._user_id = resultJSON["userId"]
                     self._auth_token = resultJSON["auth_token"]
                     self._device_secret = resultJSON["deviceSecret"]
