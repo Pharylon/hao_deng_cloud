@@ -18,7 +18,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN
 from .mqtt_connector import MqttConnector
-from .pocos import Device, ExternalColorData
+from .pocos import Device, Group, ExternalColorData
 from .rest_api_connector import RestApiConnector
 
 _LOGGER = logging.getLogger(__name__)
@@ -36,6 +36,7 @@ async def async_setup_entry(
     )
     await rest_connector.connect()
     devices: list[Device] = await rest_connector.devices()
+    mesh_groups: list[Group] = await rest_connector.groups()
     controlData = await rest_connector.get_mqtt_control_data()
     mqtt_connector = MqttConnector(controlData, config_entry.data["country"], devices)
     mqtt_connector.connect()
@@ -48,6 +49,10 @@ async def async_setup_entry(
             continue
         light = HaoDengLight(config_entry, device, mqtt_connector)
         lights.append(light)
+
+    for group in mesh_groups:
+        group_light = HaoDengGroupLight(config_entry, group, mqtt_connector)
+        lights.append(group_light)
 
     add_entities(lights)
     mqtt_connector.request_status()  # Get initial status of lights
@@ -244,5 +249,57 @@ class HaoDengLight(LightEntity):
             name=self.name,
             manufacturer="Hao Deng",
             model="Hao Deng Light",
+            sw_version="1.0.0",
+        )
+
+
+class HaoDengGroupLight(HaoDengLight):
+    """Hao Deng Group Light."""
+
+    def __init__(
+        self, config_entry: ConfigEntry, group: Group, mqtt_connector: MqttConnector
+    ) -> None:
+        """Initialize the group light."""
+        _LOGGER.info(
+            "Initializing Group Light %s (GroupID: %s)",
+            group.groupName,
+            group.groupID,
+        )
+        self._config_entry = config_entry
+        self._mqtt_connector = mqtt_connector
+        self._attr_unique_id = f"group_{group.uniID}"
+        self._attr_name = group.groupName
+        self._mesh_id = group.groupID
+        self._attr_is_on = False
+        self._rgb_color = (255, 0, 0)
+        self._attr_supported_color_modes = [
+            ColorMode.HS,
+            ColorMode.COLOR_TEMP,
+        ]
+        self._attr_color_mode = ColorMode.UNKNOWN
+        self._attr_brightness = 255
+        self._attr_should_poll = False
+        self._ignore_next_update = False
+        self._last_update = 0
+
+        self._attr_max_color_temp_kelvin = 6535
+        self._attr_min_color_temp_kelvin = 2500
+
+        self._attr_available = True
+
+        def update_light(a, d):
+            if a == self._mesh_id:
+                self._update_light(d)
+
+        mqtt_connector.subscribe(update_light)
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return the device info."""
+        return DeviceInfo(
+            identifiers={("hao_deng_cloud", f"group_{self._mesh_id}")},
+            name=self.name,
+            manufacturer="Hao Deng",
+            model="Hao Deng Light Group",
             sw_version="1.0.0",
         )

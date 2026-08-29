@@ -13,13 +13,16 @@ from cryptography.hazmat.primitives import padding
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
 from .const import MAGICHUE_COUNTRY_SERVERS
-from .pocos import Device, MqttControlData
+from .pocos import Device, Group, MqttControlData
 
 MAGICHUE_NATION_DATA_ENDPOINT = "apixp/MeshData/loadNationDataNew/ZG?language=en"
 MAGICHUE_USER_LOGIN_ENDPOINT = "apixp/User001/LoginForUser/ZG"
 MAGICHUE_GET_MESH_ENDPOINT = "apixp/MeshData/GetMyMeshPlaceItems/ZG?userId="
 MAGICHUE_GET_MESH_DEVICES_ENDPOINT = (
     "apixp/MeshData/GetMyMeshDeviceItems/ZG?placeUniID=&userId="
+)
+MAGICHUE_GET_MESH_GROUPS_ENDPOINT = (
+    "apixp/MeshData/GetMyMeshGroupInfoItems/ZG?placeUniID=&userId="
 )
 MAGICHUE_GET_MQTT_ENDPOINT: str = "apixp/Mqtt/getMasterControlData/ZG?placeUniID="
 
@@ -57,6 +60,7 @@ class RestApiConnector:
         self._installation_id = installation_id
         self.mqtt_info: list[MqttControlData] = None
         self.devices: list[Device]
+        self.places: list[str] = []
         self._placeUniID = ""
 
         if not self._installation_id:
@@ -113,21 +117,17 @@ class RestApiConnector:
 
         async with aiohttp.ClientSession() as session:
             async with session.post(uri, headers=headers, json=payload) as response:
-                if (
-                    response.status != 200
-                ):  # Previous code:   if response.status_code != 200:
+                response_json = await response.json()
+                _LOGGER.info("Login response JSON: %s", response_json)
+                if response.status != 200:
                     raise Exception(
-                        "Device retrieval for mesh failed - %s"
-                        % response.json()["error"]
+                        "Login failed - %s"
+                        % response_json.get("error", "Unknown error")
                     )
-                else:
-                    resultJSON = (await response.json())[
-                        "result"
-                    ]  # Previous Code:  responseJSON = response.json()['result'] #Previous Code:
-                    _LOGGER.info("resultJSON: %s", resultJSON)
-                    self._user_id = resultJSON["userId"]
-                    self._auth_token = resultJSON["auth_token"]
-                    self._device_secret = resultJSON["deviceSecret"]
+                resultJSON = response_json["result"]
+                self._user_id = resultJSON["userId"]
+                self._auth_token = resultJSON["auth_token"]
+                self._device_secret = resultJSON["deviceSecret"]
         await self._credentials()
 
     async def _credentials(self):
@@ -149,22 +149,23 @@ class RestApiConnector:
             _LOGGER.info("URI: %s", uri)
             async with aiohttp.ClientSession() as session:
                 async with session.get(uri, headers=headers) as response:
-                    if (
-                        response.status != 200
-                    ):  # Previous code:   if response.status_code != 200:
+                    response_json = await response.json()
+                    _LOGGER.info("Mesh place items response JSON: %s", response_json)
+                    if response.status != 200:
                         raise Exception(
                             "Device retrieval for mesh failed - %s"
-                            % response.json()["error"]
+                            % response_json.get("error", "Unknown error")
                         )
-                    else:
-                        resultJSON = (await response.json())[
-                            "result"
-                        ]  # Previous Code:  responseJSON = response.json()['result'] #Previous Code:
-                        self._placeUniID = resultJSON[0]["placeUniID"]
+                    resultJSON = response_json["result"]
+                    self.places = [x["placeUniID"] for x in resultJSON]
+                    if self.places:
+                        self._placeUniID = self.places[0]
         else:
-            raise Exception(
-                "No login session detected! - %s" % response.json()["error"]
-            )
+            raise Exception("No login session detected!")
+
+    def set_place(self, place_id: str) -> None:
+        """Set active place ID."""
+        self._placeUniID = place_id
 
     async def get_mqtt_control_data(self) -> list[MqttControlData]:
         """Get MQTT Control Data."""
@@ -184,13 +185,15 @@ class RestApiConnector:
         )
         async with aiohttp.ClientSession() as session:  # noqa: SIM117
             async with session.get(endpoint, headers=headers, timeout=30) as response:
+                response_json = await response.json()
+                _LOGGER.info("MQTT control data response JSON: %s", response_json)
                 if response.status != 200:
                     raise Exception(
                         "Device retrieval for mesh failed - {}".format(
-                            response.json()["error"]
+                            response_json.get("error", "Unknown error")
                         )
                     )  # noqa: TRY002
-                responseJSON = (await response.json())["result"]
+                responseJSON = response_json["result"]
                 myList = []
                 for x in responseJSON:
                     mqtt_info = MqttControlData(x)
@@ -226,15 +229,15 @@ class RestApiConnector:
                     endpointAddr,
                     headers=headers,
                 ) as response:
+                    response_json = await response.json()
+                    _LOGGER.info("Mesh devices response JSON: %s", response_json)
                     if response.status != 200:
                         raise Exception(  # noqa: TRY002
                             "Device retrieval for mesh failed - {}".format(
-                                response.json()["error"]
+                                response_json.get("error", "Unknown error")
                             )
                         )
-                    responseJSON = (await response.json())[
-                        "result"
-                    ]  # Previous Code:  responseJSON = response.json()['result'] #Previous Code:
+                    responseJSON = response_json["result"]
                     myList = []
                     for x in responseJSON:
                         device = Device(x)
@@ -243,5 +246,50 @@ class RestApiConnector:
                     return myList
         else:
             raise Exception(  # noqa: TRY002
-                "No login session detected! - {}".format(response.json()["error"])
+                "No login session detected!"
+            )
+
+    async def groups(self) -> list[Group]:
+        """Get a list of groups for the integration."""
+        if self._auth_token is not None and self._user_id is not None:
+            headers = {
+                "User-Agent": "HaoDeng/1.5.7(ANDROID,10,en-US)",
+                "Accept-Language": "en-US",
+                "Accept": "application/json",
+                "token": self._auth_token,
+                "Content-Type": "application/json",
+                "Accept-Encoding": "gzip",
+            }
+
+            placeUniID = self._placeUniID
+            endpointAddr = self._api_base_addr + MAGICHUE_GET_MESH_GROUPS_ENDPOINT
+            endpointAddr = endpointAddr.replace(
+                "placeUniID=", "placeUniID=" + placeUniID
+            )
+            endpointAddr = endpointAddr.replace(
+                "userId=", "userId=" + urllib.parse.quote_plus(self._user_id)
+            )
+
+            async with aiohttp.ClientSession() as session:  # noqa: SIM117
+                async with session.get(
+                    endpointAddr,
+                    headers=headers,
+                ) as response:
+                    response_json = await response.json()
+                    _LOGGER.info("Mesh groups response JSON: %s", response_json)
+                    if response.status != 200:
+                        raise Exception(  # noqa: TRY002
+                            "Group retrieval for mesh failed - {}".format(
+                                response_json.get("error", "Unknown error")
+                            )
+                        )
+                    responseJSON = response_json["result"]
+                    myList = []
+                    for x in responseJSON:
+                        group = Group(x)
+                        myList.append(group)
+                    return myList
+        else:
+            raise Exception(  # noqa: TRY002
+                "No login session detected!"
             )

@@ -32,24 +32,24 @@ class MqttConnector:
         self,
         controlData: list[MqttControlData],
         country_code: str,
-        devices: list[Device],
+        devices: list[Device] = None,
     ):
         self.subscriptions = []
         self._country_code = country_code
         self._queue: dict[str, MqttLightPayload] = {}
-        self._update_timestamps = {}
+        self._update_timestamps: dict[int, float] = {}
         for x in controlData:
             if x.deviceType == "HARDWARE":
                 self.hardware = x
             elif x.deviceType == "SOFTWARE":
                 self.software = x
         self._groups: dict[int, list[int]] = {}
-        self._devices = devices
-        for d in devices:
-            for g in d.groups:
-                if g not in self._groups:
-                    self._groups[g] = []
-                self._groups[g].append(d.meshAddress)
+        if devices:
+            for d in devices:
+                for g in d.groups:
+                    if g not in self._groups:
+                        self._groups[g] = []
+                    self._groups[g].append(d.meshAddress)
 
     def get_server_addr(self):
         """Get the server address for the country code."""
@@ -72,12 +72,12 @@ class MqttConnector:
             data = json.loads(msg.payload.decode("ASCII"))
             for d in data:
                 # _LOGGER.info("ON_MESSAGE: A: %d, D: %s", d["a"], d["d"])
+                self._update_timestamps[d["a"]] = time.time()
+                color_tuple = self._convert_notification_data_to_color_data(
+                    d["d"], d["a"]
+                )
                 for s in self.subscriptions:
-                    color_tuple = self._convert_notification_data_to_color_data(
-                        d["d"], d["a"]
-                    )
                     s(d["a"], color_tuple)
-                    self._update_timestamps.update({d["a"]: time.time()})
 
         mqttc: mqtt.Client
         if paho.mqtt.__version__[0] > '1':
@@ -197,116 +197,75 @@ class MqttConnector:
             payloadJson,
         )
 
-    def _group_payloads_by_data(
-        self, payloads: list[MqttLightPayload]
-    ) -> dict[int, list[MqttLightPayload]]:
-        grouped_by_data = {}
-        for p in payloads:
-            if p.data not in grouped_by_data:
-                grouped_by_data[p.data] = []
-            grouped_by_data[p.data].append(p)
-        return grouped_by_data
-
-    def _group_payloads_by_op_code(
-        self, payloads: list[MqttLightPayload]
-    ) -> dict[int, list[MqttLightPayload]]:
-        grouped_by_op_code = {}
-        for p in payloads:
-            if p.opCode not in grouped_by_op_code:
-                grouped_by_op_code[p.opCode] = []
-            grouped_by_op_code[p.opCode].append(p)
-        return grouped_by_op_code
-
-    def _create_group_payloads(self, payloads: list[MqttLightPayload]):
-        """Group all payloads by their group ID, so we can send the control message to the group instead of each individual device.
-        Payloads should already have the same OpCode and Data at this stage.
-        """  # noqa: D205
-
-        final_payloads: list[MqttLightPayload] = []
-        # _LOGGER.info("Payload len befor mesh addresses: %s", len(payloads))
-        mesh_addresses = [x.dstAdr for x in payloads]
-        # _LOGGER.info("Mesh addresses: %s", mesh_addresses)
-        for group_id, group_addresses in self._groups.items():
-            # _LOGGER.info("Group ID %s, group addresses: %s", group_id, group_addresses)
-            if all(addr in mesh_addresses for addr in group_addresses):
-                group_payload = MqttLightPayload(
-                    group_id, payloads[0].opCode, payloads[0].data
-                )
-                final_payloads.append(group_payload)
-        group_address_payloads = [x.dstAdr for x in final_payloads]
-        for p in payloads:
-            device = next((x for x in self._devices if x.meshAddress == p.dstAdr), None)
-            if device is not None:
-                already_queued = [
-                    g_id for g_id in device.groups if g_id in group_address_payloads
-                ]
-                if len(already_queued) == 0:
-                    final_payloads.append(p)
-        return final_payloads
-
     async def _send_queue(self):
         if len(self._queue) > 0:
-            grouped_by_op_code = self._group_payloads_by_op_code(self._queue.values())
-            for op_code_group in grouped_by_op_code.values():
-                grouped_by_data = self._group_payloads_by_data(op_code_group)
-                for data_group in grouped_by_data.values():
-                    final_paylods: list[MqttLightPayload] = self._create_group_payloads(
-                        data_group
-                    )
-                    for p in final_paylods:
-                        payloadJson = json.dumps(p.__dict__)
-                        _LOGGER.info(
-                            "Sending payload for id %s: %s", p.dstAdr, payloadJson
-                        )
-                        self.client.publish(
-                            f"/{self.software.productKey}/{self.software.deviceName}/control",
-                            payloadJson,
-                            qos=1,
-                        )
-            self._ensure_queue_sent()
-            await asyncio.sleep(0.1)
-
-    def _ensure_queue_sent(self):
-        try:
-            loop = asyncio.get_running_loop()
-        except RuntimeError:  # 'RuntimeError: There is no current event loop...'
-            loop = None
-        if loop and loop.is_running():
-            loop.create_task(self._wait_and_retry_queue())
-
-    async def _wait_and_retry_queue(self):
-        await asyncio.sleep(3)
-        for queue_item in self._queue.values():
-            last_update = self._update_timestamps[queue_item.dstAdr]
-            if time.time() - last_update > 5:
-                # We sent a upate, but didn't recieve a corresponding update from the broker, retry
-                _LOGGER.warning(
-                    "Didn't get update for %s, resending", queue_item.dstAdr
-                )
-                payloadJson = json.dumps(queue_item.__dict__)
+            queue_items = list(self._queue.values())
+            for p in queue_items:
+                payloadJson = json.dumps(p.__dict__)
+                _LOGGER.info("Sending payload for id %s: %s", p.dstAdr, payloadJson)
                 self.client.publish(
                     f"/{self.software.productKey}/{self.software.deviceName}/control",
                     payloadJson,
                     qos=1,
                 )
-                await asyncio.sleep(0.1)
+            self._ensure_queue_sent(queue_items)
+            await asyncio.sleep(0.1)
+
+    def _ensure_queue_sent(self, queue_items: list[MqttLightPayload]):
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:  # 'RuntimeError: There is no current event loop...'
+            loop = None
+        if loop and loop.is_running():
+            loop.create_task(self._wait_and_retry_queue(queue_items))
+
+    async def _wait_and_retry_queue(self, queue_items: list[MqttLightPayload]):
+        await asyncio.sleep(3)
+        for queue_item in queue_items:
+            dst_adr = queue_item.dstAdr
+            # Check if this destination address is a group
+            if dst_adr in self._groups:
+                group_members = self._groups[dst_adr]
+                if group_members:
+                    all_updated = all(
+                        time.time() - self._update_timestamps.get(addr, 0) <= 5
+                        for addr in group_members
+                    )
+                    if not all_updated:
+                        _LOGGER.warning(
+                            "Didn't get updates for all lights in group %s, resending",
+                            dst_adr,
+                        )
+                        payloadJson = json.dumps(queue_item.__dict__)
+                        self.client.publish(
+                            f"/{self.software.productKey}/{self.software.deviceName}/control",
+                            payloadJson,
+                            qos=1,
+                        )
+                        await asyncio.sleep(0.1)
+                    else:
+                        _LOGGER.info(
+                            "All lights in group %s updated after send", dst_adr
+                        )
             else:
-                _LOGGER.info("Light %s, updated after send", queue_item.dstAdr)
+                last_update = self._update_timestamps.get(dst_adr, 0)
+                if time.time() - last_update > 5:
+                    # We sent an update, but didn't receive a corresponding update from the broker, retry
+                    _LOGGER.warning("Didn't get update for %s, resending", dst_adr)
+                    payloadJson = json.dumps(queue_item.__dict__)
+                    self.client.publish(
+                        f"/{self.software.productKey}/{self.software.deviceName}/control",
+                        payloadJson,
+                        qos=1,
+                    )
+                    await asyncio.sleep(0.1)
+                else:
+                    _LOGGER.info("Light %s updated after send", dst_adr)
 
     async def _add_to_queue(self, payload: MqttLightPayload):
-        # _LOGGER.info("Queueing %s ", payload.dstAdr)
         async with lock:
             self._queue.update({payload.dstAdr: payload})
-        # queue_length = len(self._queue)
-        # Wait a very short period to see if other requests get put in the queue
         await asyncio.sleep(0.01)
-        # new_queue_length = len(self._queue)
-        # while queue_length != new_queue_length:
-        #     _LOGGER.info("Adding to queue. Current length: %s", len(self._queue))
-        #     queue_length = new_queue_length
-        #     await asyncio.sleep(0.01)
-        #     new_queue_length = len(self._queue)
-        # _LOGGER.info("Done making queue. CUrrent length: %s", len(self._queue))
         async with lock:
             await self._send_queue()
             self._queue = {}

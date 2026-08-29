@@ -65,6 +65,26 @@ class Device:
         self.groups = [x for x in groups if x > 0]
 
 
+class Group:
+    uniID: str
+    CDPID: str
+    userID: str
+    placeUniID: str
+    groupID: int
+    groupName: str
+    lastUpdateDate: str
+
+    def __init__(self, json) -> None:
+        """Initialize."""
+        self.uniID = json["uniID"]
+        self.CDPID = json.get("CDPID")
+        self.userID = json["userID"]
+        self.placeUniID = json["placeUniID"]
+        self.groupID = json["groupID"]
+        self.groupName = json["groupName"]
+        self.lastUpdateDate = json.get("lastUpdateDate")
+
+
 class ExternalColorData:
     isHsv: bool
     hsv: list[int]
