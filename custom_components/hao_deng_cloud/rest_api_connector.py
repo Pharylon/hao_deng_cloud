@@ -59,7 +59,7 @@ class RestApiConnector:
         self._device_secret = None
         self._installation_id = installation_id
         self.mqtt_info: list[MqttControlData] = None
-        self.devices: list[Device]
+        self._devices_list: list[Device]
         self.places: list[str] = []
         self._placeUniID = ""
 
@@ -242,7 +242,7 @@ class RestApiConnector:
                     for x in responseJSON:
                         device = Device(x)
                         myList.append(device)
-                    self.devices = myList
+                    self._devices_list = myList
                     return myList
         else:
             raise Exception(  # noqa: TRY002
