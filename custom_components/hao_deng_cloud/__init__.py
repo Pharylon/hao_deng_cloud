@@ -8,10 +8,9 @@ from homeassistant.components.light import DOMAIN as LIGHT_DOMAIN
 from homeassistant.components.sensor import DOMAIN as SENSOR_DOMAIN
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.components.light import LightEntity
+from homeassistant.helpers import device_registry as dr
 
 from .const import DOMAIN
-from .light import HaoDengLight
 
 PLATFORMS = [LIGHT_DOMAIN, SENSOR_DOMAIN]
 
@@ -28,3 +27,11 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
     """Set up the light platform."""
     await hass.config_entries.async_forward_entry_setups(config_entry, ["light"])
     return True
+
+
+async def async_remove_config_entry_device(
+    hass: HomeAssistant, config_entry: ConfigEntry, device_entry: dr.DeviceEntry
+) -> bool:
+    """Remove a config entry from a device."""
+    return True
+
