@@ -39,7 +39,7 @@ Do you have [HACS](https://hacs.xyz/) installed?
 4. Search for and select `Hao Deng Cloud`
 5. Enter you `username` and `password` you also use in the **Hao Deng** app
 6. The system will download you light list and add them to Home Assistant
-7. Once the system connects, the lights your lights will show up as _available_ and can be controlled from HA   
+7. Once the system connects, your lights will show up as _available_ and can be controlled from HA   
 8. Enjoy :)
 
 ### Version 3.0 Updates and Breaking Changes
