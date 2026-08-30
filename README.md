@@ -33,13 +33,19 @@ Do you have [HACS](https://hacs.xyz/) installed?
 
 ### Setup
 1. In Home Assistant click on `Settings`
-1. Click on `Devices & services`
-1. Click on `+ Add integration`
-1. Search for and select `Hao Deng Cloud`
-1. Enter you `username` and `password` you also use in the **Hao Deng** app
-1. The system will download you light list and add them to Home Assistant
-1. Once the system could connect to one of the lights your lights will show up as _available_ and can be controlled from HA   
-1. Enjoy :)
+2. Click on `Devices & services`
+3. Click on `+ Add integration`
+4. Search for and select `Hao Deng Cloud`
+5. Enter you `username` and `password` you also use in the **Hao Deng** app
+6. The system will download you light list and add them to Home Assistant
+7. Once the system could connect to one of the lights your lights will show up as _available_ and can be controlled from HA   
+8. Enjoy :)
+
+### Version 3.0 Updates and Breaking Changes
+1. Added support for multiple mesh places. **As part of this, device IDs will change in Home Assistant. You'll need to delete the old ones!**
+2. Automatically show groups in the Hao Deng app is lights! This fixes a lot of bugs releated to controlling multiple lights at once. You really shouldn't use groups in Home Assistant. The bridge can't handle too many concurrent requests. Is that dumb? Yeah. After you have your groups set up in the Hao Deng app, reboot home assistant to pick them up!
+
+
 
 ## Troubleshooting
 **This integration requires the cloud**
