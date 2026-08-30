@@ -19,7 +19,7 @@ lock = asyncio.Lock()
 
 
 def on_subscribe(client, userdata, mid, granted_qos):
-    _LOGGER.info("Subscribed: %s %s", str(mid), str(granted_qos))
+    _LOGGER.debug("Subscribed: %s %s", str(mid), str(granted_qos))
 
 
 class MqttConnector:
@@ -72,7 +72,7 @@ class MqttConnector:
     def connect(self):
         def on_connect(client, userdata, flags, rc):
             self.client_connected = True
-            _LOGGER.info(f"Connected with result code {rc}")
+            _LOGGER.debug(f"Connected with result code {rc}")
             # print("/LCTLdnl8aKqCI/2c9459fd87084f1201873d5b002507bb/subStatus")
             # print(f"/{self.software.productKey}/{self.software.deviceName}/subStatus")
             client.subscribe(
@@ -124,14 +124,14 @@ class MqttConnector:
 
     async def turn_on(self, deviceId: int):
         """Turn the light on."""
-        _LOGGER.info("TURN_ON for ID %s", deviceId)
+        _LOGGER.debug("TURN_ON for ID %s", deviceId)
         ct = self._get_control_type_hex(deviceId)
         payload = MqttLightPayload(deviceId, "D0", f"{ct}01FF000000000300")
         await self._add_to_queue(payload)
 
     async def turn_off(self, deviceId: int):
         """Turn the light off."""
-        _LOGGER.info("TURN_OFF for ID %s", deviceId)
+        _LOGGER.debug("TURN_OFF for ID %s", deviceId)
         ct = self._get_control_type_hex(deviceId)
         payload = MqttLightPayload(deviceId, "D0", f"{ct}0100000000000300")
         await self._add_to_queue(payload)
@@ -217,7 +217,7 @@ class MqttConnector:
             queue_items = list(self._queue.values())
             for p in queue_items:
                 payloadJson = json.dumps(p.__dict__)
-                _LOGGER.info("Sending payload for id %s: %s", p.dstAdr, payloadJson)
+                _LOGGER.debug("Sending payload for id %s: %s", p.dstAdr, payloadJson)
                 self.client.publish(
                     f"/{self.software.productKey}/{self.software.deviceName}/control",
                     payloadJson,
@@ -259,7 +259,7 @@ class MqttConnector:
                         )
                         await asyncio.sleep(0.1)
                     else:
-                        _LOGGER.info(
+                        _LOGGER.debug(
                             "All lights in group %s updated after send", dst_adr
                         )
             else:
@@ -275,7 +275,7 @@ class MqttConnector:
                     )
                     await asyncio.sleep(0.1)
                 else:
-                    _LOGGER.info("Light %s updated after send", dst_adr)
+                    _LOGGER.debug("Light %s updated after send", dst_adr)
 
     async def _add_to_queue(self, payload: MqttLightPayload):
         async with lock:

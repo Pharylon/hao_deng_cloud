@@ -128,7 +128,7 @@ class HaoDengBaseLight(LightEntity):
                     self._mesh_id, rgb[0], rgb[1], rgb[2]
                 )
         else:
-            _LOGGER.info("Just turned on %s ", self._attr_name)
+            _LOGGER.debug("Just turned on %s ", self._attr_name)
             if getattr(self, "hass", None) is not None:
                 self.async_write_ha_state()
             await self._mqtt_connector.turn_on(self._mesh_id)
@@ -140,7 +140,7 @@ class HaoDengBaseLight(LightEntity):
 
     async def async_turn_off(self, **kwargs) -> None:
         """Turn the light off."""
-        _LOGGER.info("TURN OFF ASYNC %s", self._attr_name)
+        _LOGGER.debug("TURN OFF ASYNC %s", self._attr_name)
         self._attr_is_on = False
         if getattr(self, "hass", None) is not None:
             self.async_write_ha_state()
