@@ -3,7 +3,6 @@
 import asyncio
 import colorsys
 import logging
-import math
 import time
 
 from homeassistant.components.light import (
@@ -16,7 +15,6 @@ from homeassistant.components.light import (
 from homeassistant.config_entries import ConfigEntry
 
 from .mqtt_connector import MqttConnector
-from .pocos import ExternalColorData
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -47,6 +45,8 @@ class HaoDengBaseLight(LightEntity):
         ]
         self._attr_color_mode = ColorMode.UNKNOWN
         self._attr_brightness = 255
+        self._attr_hs_color = None
+        self._attr_color_temp_kelvin = None
         self._attr_should_poll = False
         self._ignore_next_update = False
         self._last_update = 0
@@ -56,70 +56,37 @@ class HaoDengBaseLight(LightEntity):
 
         self._attr_available = initial_available
 
-        def update_light(a, d):
-            if a == self._mesh_id:
-                self._update_light(d)
+    @property
+    def is_on(self) -> bool:
+        """Return True if entity is on."""
+        return self._attr_is_on
 
-        mqtt_connector.subscribe(update_light)
+    @property
+    def brightness(self) -> int | None:
+        """Return the brightness of this light between 0..255."""
+        return self._attr_brightness
 
-    def get_base_colors(self, rgb: tuple[int, int, int]) -> tuple[int, int, int]:
-        """Get what the colors would be at brightness 100%."""
-        multiplier = max(rgb) / 255
-        adjusted_colors = []
-        for color in rgb:
-            adjusted_value = min(math.ceil(color / multiplier), 255)
-            adjusted_colors.append(adjusted_value)
-        return adjusted_colors
+    @property
+    def color_mode(self) -> ColorMode | None:
+        """Return the current color mode."""
+        return self._attr_color_mode
 
-    def _update_hsv_values(self, color_data: ExternalColorData):
-        if color_data.hsv[0] == 0 and color_data.hsv[1] == 0 and color_data.hsv[2] == 0:
-            self._attr_is_on = False
-            return
-        self._attr_is_on = True
-        self._attr_brightness = color_data.hsv[2] * 255
-        self._attr_hs_color = [color_data.hsv[0], color_data.hsv[1] * 100]
-        self._attr_color_mode = ColorMode.HS
+    @property
+    def hs_color(self) -> tuple[float, float] | None:
+        """Return the current HS color."""
+        return self._attr_hs_color
 
-    def _update_light_color_temp(self, color_data: ExternalColorData):
-        self._attr_is_on = color_data.colorTempBrightness[1] > 0
-        if self._attr_is_on is False:
-            return
-        self._attr_color_mode = ColorMode.COLOR_TEMP
-        self._attr_color_temp_kelvin = color_data.colorTempBrightness[0]
-        self._attr_brightness = min(
-            math.ceil(color_data.colorTempBrightness[1] * 255), 255
-        )
+    @property
+    def color_temp_kelvin(self) -> int | None:
+        """Return the current color temperature in Kelvin."""
+        return self._attr_color_temp_kelvin
 
-    def _update_light(self, color_data: ExternalColorData):
-        """Update light from fetched cloud data."""
-        try:
-            if color_data.isAvailable is False:
-                _LOGGER.warning(
-                    "Update timestamp for %s is 00, light is unavailable",
-                    self._attr_name,
-                )
-                return
-            if (
-                time.time() - self._last_update < 5
-                and self._attr_color_mode != ColorMode.UNKNOWN
-            ):
-                return
-            _LOGGER.info("Updating %s", self._attr_name)
-            if color_data.isHsv:
-                self._update_hsv_values(color_data)
-            else:
-                self._update_light_color_temp(color_data)
-            self._attr_available = True
-            self.schedule_update_ha_state()
-        except Exception as e:
-            _LOGGER.error(
-                "Error updating light %s with data %s. Error was %s",
-                self._attr_name,
-                repr(color_data.__dict__),
-                e,
-            )
+    @property
+    def available(self) -> bool:
+        """Return True if entity is available."""
+        return self._attr_available
 
-    def _hsv_to_rgb(self, hs: tuple[float, float], brightness: float):
+    def _hsv_to_rgb(self, hs: tuple[float, float], brightness: float) -> list[float]:
         brightness_scale_100 = brightness / 255
         rgb_float = colorsys.hsv_to_rgb(hs[0] / 365, hs[1] / 100, brightness_scale_100)
         rgb = [rgb_float[0] * 255, rgb_float[1] * 255, rgb_float[2] * 255]
@@ -135,19 +102,22 @@ class HaoDengBaseLight(LightEntity):
             self._attr_color_mode = ColorMode.HS
             self._attr_hs_color = kwargs[ATTR_HS_COLOR]
             rgb = self._hsv_to_rgb(self._attr_hs_color, self._attr_brightness)
-            self.async_write_ha_state()
+            if getattr(self, "hass", None) is not None:
+                self.async_write_ha_state()
             await self._mqtt_connector.set_color(self._mesh_id, rgb[0], rgb[1], rgb[2])
         elif ATTR_COLOR_TEMP_KELVIN in kwargs:
             self._attr_color_mode = ColorMode.COLOR_TEMP
             self._attr_color_temp_kelvin = kwargs[ATTR_COLOR_TEMP_KELVIN]
-            self.async_write_ha_state()
+            if getattr(self, "hass", None) is not None:
+                self.async_write_ha_state()
             await self._mqtt_connector.set_color_temp(
                 self._mesh_id,
                 self._attr_color_temp_kelvin,
                 self._attr_brightness,
             )
         elif ATTR_BRIGHTNESS in kwargs:
-            self.async_write_ha_state()
+            if getattr(self, "hass", None) is not None:
+                self.async_write_ha_state()
             if self._attr_color_mode == ColorMode.COLOR_TEMP:
                 await self._mqtt_connector.set_color_temp(
                     self._mesh_id, self._attr_color_temp_kelvin, self._attr_brightness
@@ -159,7 +129,8 @@ class HaoDengBaseLight(LightEntity):
                 )
         else:
             _LOGGER.info("Just turned on %s ", self._attr_name)
-            self.async_write_ha_state()
+            if getattr(self, "hass", None) is not None:
+                self.async_write_ha_state()
             await self._mqtt_connector.turn_on(self._mesh_id)
             if self._attr_color_mode == ColorMode.UNKNOWN:
                 # Light was off, so we don't know its color state. Ask the cloud for new color
@@ -171,7 +142,7 @@ class HaoDengBaseLight(LightEntity):
         """Turn the light off."""
         _LOGGER.info("TURN OFF ASYNC %s", self._attr_name)
         self._attr_is_on = False
-        self.async_write_ha_state()
+        if getattr(self, "hass", None) is not None:
+            self.async_write_ha_state()
         await self._mqtt_connector.turn_off(self._mesh_id)
         self._last_update = time.time()
-

@@ -51,6 +51,22 @@ if "homeassistant" not in sys.modules:
             return self._attr_is_on
 
         @property
+        def brightness(self):
+            return self._attr_brightness
+
+        @property
+        def color_mode(self):
+            return self._attr_color_mode
+
+        @property
+        def hs_color(self):
+            return self._attr_hs_color
+
+        @property
+        def color_temp_kelvin(self):
+            return self._attr_color_temp_kelvin
+
+        @property
         def available(self):
             return self._attr_available
 
@@ -123,38 +139,40 @@ from custom_components.hao_deng_cloud.group_light import HaoDengGroupLight
 from custom_components.hao_deng_cloud.pocos import Device, ExternalColorData, Group
 
 
-def create_sample_device(mesh_address: int = 1) -> Device:
+def create_sample_device(mesh_address: int = 1, groups: list[int] = None) -> Device:
     """Create a sample Device."""
+    if groups is None:
+        groups = [10]
     return Device({
-        "uniID": "dev_uni_123",
+        "uniID": f"dev_uni_{mesh_address}",
         "userID": "user_001",
         "placeUniID": "place_001",
-        "macAddress": "AA:BB:CC:11:22:33",
-        "displayName": "Kitchen Ceiling",
+        "macAddress": f"AA:BB:CC:11:22:{mesh_address:02x}",
+        "displayName": f"Kitchen Light {mesh_address}",
         "meshAddress": mesh_address,
         "deviceType": 1,
         "controlType": 1,
         "wiringType": 1,
-        "group1ID": 10,
-        "group2ID": 0,
-        "group3ID": 0,
-        "group4ID": 0,
-        "group5ID": 0,
-        "group6ID": 0,
-        "group7ID": 0,
-        "group8ID": 0,
+        "group1ID": groups[0] if len(groups) > 0 else 0,
+        "group2ID": groups[1] if len(groups) > 1 else 0,
+        "group3ID": groups[2] if len(groups) > 2 else 0,
+        "group4ID": groups[3] if len(groups) > 3 else 0,
+        "group5ID": groups[4] if len(groups) > 4 else 0,
+        "group6ID": groups[5] if len(groups) > 5 else 0,
+        "group7ID": groups[6] if len(groups) > 6 else 0,
+        "group8ID": groups[7] if len(groups) > 7 else 0,
     })
 
 
 def create_sample_group(group_id: int = 10) -> Group:
     """Create a sample Group."""
     return Group({
-        "uniID": "group_uni_456",
+        "uniID": f"group_uni_{group_id}",
         "CDPID": "cdp_001",
         "userID": "user_001",
         "placeUniID": "place_001",
         "groupID": group_id,
-        "groupName": "Kitchen All",
+        "groupName": f"Kitchen Group {group_id}",
         "lastUpdateDate": "2026-01-01",
     })
 
@@ -179,44 +197,53 @@ class TestLightEntities(unittest.IsolatedAsyncioTestCase):
         device = create_sample_device(mesh_address=7)
         light = HaoDengLight(self.mock_config_entry, device, self.mock_mqtt)
 
-        self.assertEqual(light.unique_id, "dev_uni_123")
-        self.assertEqual(light.name, "Kitchen Ceiling")
+        self.assertEqual(light.unique_id, "dev_uni_7")
+        self.assertEqual(light.name, "Kitchen Light 7")
         self.assertEqual(light._mesh_id, 7)
         self.assertFalse(light.available)  # Device lights start unavailable until update
-        self.assertEqual(light._device, device)
+        self.assertEqual(light.mesh_device, device)
 
         # Check device info
         dev_info = light.device_info
-        self.assertEqual(dev_info.name, "Kitchen Ceiling")
+        self.assertEqual(dev_info.name, "Kitchen Light 7")
         self.assertEqual(dev_info.manufacturer, "Hao Deng")
         self.assertEqual(dev_info.model, "Hao Deng Light")
-        self.assertEqual(dev_info.identifiers, {("hao_deng_cloud", "dev_uni_123")})
+        self.assertEqual(dev_info.identifiers, {("hao_deng_cloud", "dev_uni_7")})
 
-        # Check MQTT subscription was registered
+        # Check MQTT subscription was registered specifically for mesh_id
         self.mock_mqtt.subscribe.assert_called_once()
 
-    def test_group_light_initialization(self):
-        """Test group light initialization and properties."""
+    def test_group_light_initialization_with_members(self):
+        """Test group light initialization with member device lights."""
         group = create_sample_group(group_id=25)
-        group_light = HaoDengGroupLight(self.mock_config_entry, group, self.mock_mqtt)
+        device1 = create_sample_device(mesh_address=1, groups=[25])
+        device2 = create_sample_device(mesh_address=2, groups=[25])
 
-        self.assertEqual(group_light.unique_id, "group_group_uni_456")
-        self.assertEqual(group_light.name, "Kitchen All")
+        light1 = HaoDengLight(self.mock_config_entry, device1, self.mock_mqtt)
+        light2 = HaoDengLight(self.mock_config_entry, device2, self.mock_mqtt)
+
+        group_light = HaoDengGroupLight(
+            self.mock_config_entry, group, self.mock_mqtt, members=[light1, light2]
+        )
+
+        self.assertEqual(group_light.unique_id, "group_group_uni_25")
+        self.assertEqual(group_light.name, "Kitchen Group 25")
         self.assertEqual(group_light._mesh_id, 25)
-        self.assertTrue(group_light.available)  # Group lights start available
-        self.assertEqual(group_light._group, group)
+        self.assertEqual(len(group_light.members), 2)
+        self.assertEqual(group_light.mesh_group, group)
+
+        # Group light does not subscribe directly to MQTT
+        # (the 2 subscribe calls are only from light1 and light2)
+        self.assertEqual(self.mock_mqtt.subscribe.call_count, 2)
 
         # Check device info
         dev_info = group_light.device_info
-        self.assertEqual(dev_info.name, "Kitchen All")
+        self.assertEqual(dev_info.name, "Kitchen Group 25")
         self.assertEqual(dev_info.manufacturer, "Hao Deng")
         self.assertEqual(dev_info.model, "Hao Deng Light Group")
         self.assertEqual(
-            dev_info.identifiers, {("hao_deng_cloud", "group_group_uni_456")}
+            dev_info.identifiers, {("hao_deng_cloud", "group_group_uni_25")}
         )
-
-        # Check MQTT subscription was registered
-        self.mock_mqtt.subscribe.assert_called_once()
 
     def test_aliases_and_inheritance(self):
         """Test alias and inheritance hierarchies."""
@@ -224,12 +251,20 @@ class TestLightEntities(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(issubclass(HaoDengLight, HaoDengBaseLight))
         self.assertTrue(issubclass(HaoDengGroupLight, HaoDengBaseLight))
 
-    def test_update_hsv_status(self):
-        """Test status update with HSV color data."""
-        device = create_sample_device(mesh_address=7)
+    def test_update_hsv_status_and_group_propagation(self):
+        """Test device status update propagating to group light."""
+        group = create_sample_group(group_id=10)
+        device = create_sample_device(mesh_address=7, groups=[10])
         light = HaoDengLight(self.mock_config_entry, device, self.mock_mqtt)
+        group_light = HaoDengGroupLight(
+            self.mock_config_entry, group, self.mock_mqtt, members=[light]
+        )
 
-        # Simulate update callback from MQTT
+        # Device is off initially
+        self.assertFalse(light.is_on)
+        self.assertFalse(group_light.is_on)
+
+        # Simulate update callback from MQTT on device
         color_data_on = ExternalColorData(
             isHsl=True,
             hsv=[180.0, 0.75, 0.8],
@@ -238,13 +273,21 @@ class TestLightEntities(unittest.IsolatedAsyncioTestCase):
         )
         light._update_light(color_data_on)
 
+        # Verify device light state
         self.assertTrue(light.is_on)
         self.assertTrue(light.available)
-        self.assertEqual(light._attr_color_mode, ColorMode.HS)
-        self.assertEqual(light._attr_hs_color, [180.0, 75.0])
-        self.assertEqual(light._attr_brightness, 0.8 * 255)
+        self.assertEqual(light.color_mode, ColorMode.HS)
+        self.assertEqual(light.hs_color, [180.0, 75.0])
+        self.assertEqual(light.brightness, 0.8 * 255)
 
-        # Simulate update callback when light is turned off (hsv=[0, 0, 0])
+        # Verify group light state derived from device light
+        self.assertTrue(group_light.is_on)
+        self.assertTrue(group_light.available)
+        self.assertEqual(group_light.color_mode, ColorMode.HS)
+        self.assertEqual(group_light.hs_color, [180.0, 75.0])
+        self.assertEqual(group_light.brightness, 0.8 * 255)
+
+        # Simulate device light turning off
         color_data_off = ExternalColorData(
             isHsl=True,
             hsv=[0, 0, 0],
@@ -252,25 +295,172 @@ class TestLightEntities(unittest.IsolatedAsyncioTestCase):
             isAvailable=True,
         )
         light._update_light(color_data_off)
+
         self.assertFalse(light.is_on)
+        self.assertFalse(group_light.is_on)
 
-    def test_update_color_temp_status(self):
-        """Test status update with color temperature data."""
-        group = create_sample_group(group_id=25)
-        group_light = HaoDengGroupLight(self.mock_config_entry, group, self.mock_mqtt)
+    async def test_member_async_turn_on_and_off_updates_group(self):
+        """Test that async_turn_on and async_turn_off on a member entity updates the group light."""
+        group = create_sample_group(group_id=10)
+        dev1 = create_sample_device(mesh_address=1, groups=[10])
+        dev2 = create_sample_device(mesh_address=2, groups=[10])
 
-        color_data_ct = ExternalColorData(
-            isHsl=False,
-            hsv=None,
-            colorTempBrightness=[4000, 0.6],
-            isAvailable=True,
+        light1 = HaoDengLight(self.mock_config_entry, dev1, self.mock_mqtt)
+        light2 = HaoDengLight(self.mock_config_entry, dev2, self.mock_mqtt)
+
+        group_light = HaoDengGroupLight(
+            self.mock_config_entry, group, self.mock_mqtt, members=[light1, light2]
         )
-        group_light._update_light(color_data_ct)
+
+        # Initially group is off
+        self.assertFalse(group_light.is_on)
+        self.assertEqual(group_light.brightness, 0)
+
+        # Turn on light 1 via UI call (async_turn_on)
+        await light1.async_turn_on(brightness=200)
+
+        # Group light should immediately derive ON state and 50% proportional brightness (100 / 255)
+        self.assertTrue(group_light.is_on)
+        self.assertAlmostEqual(group_light.brightness, 100.0, delta=1.0)
+
+        # Turn on light 2 via UI call (async_turn_on)
+        await light2.async_turn_on(brightness=200)
+
+        # Group light is 100% of the 200 brightness (200 / 255)
+        self.assertTrue(group_light.is_on)
+        self.assertAlmostEqual(group_light.brightness, 200.0, delta=1.0)
+
+        # Turn off light 1 via UI call (async_turn_off)
+        await light1.async_turn_off()
+
+        # Group light remains on at 100 brightness
+        self.assertTrue(group_light.is_on)
+        self.assertAlmostEqual(group_light.brightness, 100.0, delta=1.0)
+
+        # Turn off light 2 via UI call (async_turn_off)
+        await light2.async_turn_off()
+
+        # Group light is off
+        self.assertFalse(group_light.is_on)
+        self.assertEqual(group_light.brightness, 0)
+
+    async def test_group_async_turn_on_and_off_updates_members(self):
+        """Test that turning group on or off in HA updates all member entities in HA."""
+        group = create_sample_group(group_id=10)
+        dev1 = create_sample_device(mesh_address=1, groups=[10])
+        dev2 = create_sample_device(mesh_address=2, groups=[10])
+
+        light1 = HaoDengLight(self.mock_config_entry, dev1, self.mock_mqtt)
+        light2 = HaoDengLight(self.mock_config_entry, dev2, self.mock_mqtt)
+
+        group_light = HaoDengGroupLight(
+            self.mock_config_entry, group, self.mock_mqtt, members=[light1, light2]
+        )
+
+        # Turn on group
+        await group_light.async_turn_on(brightness=255, color_temp_kelvin=6000)
 
         self.assertTrue(group_light.is_on)
-        self.assertEqual(group_light._attr_color_mode, ColorMode.COLOR_TEMP)
-        self.assertEqual(group_light._attr_color_temp_kelvin, 4000)
-        self.assertEqual(group_light._attr_brightness, 153)
+        self.assertTrue(light1.is_on)
+        self.assertTrue(light2.is_on)
+        self.assertEqual(light1.brightness, 255)
+        self.assertEqual(light2.brightness, 255)
+        self.assertEqual(light1.color_mode, ColorMode.COLOR_TEMP)
+        self.assertEqual(light2.color_mode, ColorMode.COLOR_TEMP)
+
+        # Turn off group
+        await group_light.async_turn_off()
+
+        self.assertFalse(group_light.is_on)
+        self.assertFalse(light1.is_on)
+        self.assertFalse(light2.is_on)
+
+    def test_pocos_group_and_device_integer_normalization(self):
+        """Test that group and device group IDs are normalized to integer even if given as string."""
+        dev = Device({
+            "uniID": "123",
+            "userID": "u",
+            "placeUniID": "p",
+            "macAddress": "m",
+            "displayName": "d",
+            "meshAddress": "5",
+            "deviceType": "1",
+            "controlType": "1",
+            "wiringType": "1",
+            "group1ID": "32771",
+            "group2ID": 0,
+            "group3ID": None,
+            "group4ID": 0,
+            "group5ID": 0,
+            "group6ID": 0,
+            "group7ID": 0,
+            "group8ID": 0,
+        })
+        grp = Group({
+            "uniID": "g1",
+            "userID": "u",
+            "placeUniID": "p",
+            "groupID": "32771",
+            "groupName": "Great Room",
+        })
+
+        self.assertEqual(dev.meshAddress, 5)
+        self.assertEqual(dev.groups, [32771])
+        self.assertEqual(grp.groupID, 32771)
+        self.assertIn(grp.groupID, dev.groups)
+
+    def test_group_step_by_step_shutoff_proportional_brightness(self):
+        """Test that turning off 4 member lights one by one scales group brightness 100% -> 75% -> 50% -> 25% -> 0%."""
+        group = create_sample_group(group_id=100)
+        members = [
+            HaoDengLight(self.mock_config_entry, create_sample_device(mesh_address=i, groups=[100]), self.mock_mqtt)
+            for i in range(1, 5)
+        ]
+        group_light = HaoDengGroupLight(self.mock_config_entry, group, self.mock_mqtt, members=members)
+
+        # Initially all 4 members turned ON at 100% brightness (255) in Color Temp mode
+        for m in members:
+            m._update_light(
+                ExternalColorData(
+                    isHsl=False,
+                    hsv=None,
+                    colorTempBrightness=[6500, 1.0],  # 100% brightness
+                    isAvailable=True,
+                )
+            )
+
+        # 4/4 lights on: 100% brightness (255)
+        self.assertTrue(group_light.is_on)
+        self.assertEqual(group_light.brightness, 255)
+        self.assertEqual(group_light.color_mode, ColorMode.COLOR_TEMP)
+
+        # Turn off 1st member (1/4 off -> 75% group brightness)
+        members[0]._update_light(
+            ExternalColorData(isHsl=True, hsv=[0, 0, 0], colorTempBrightness=None, isAvailable=True)
+        )
+        self.assertTrue(group_light.is_on)
+        self.assertAlmostEqual(group_light.brightness / 255 * 100, 75.0, delta=0.5)
+
+        # Turn off 2nd member (2/4 off -> 50% group brightness)
+        members[1]._update_light(
+            ExternalColorData(isHsl=True, hsv=[0, 0, 0], colorTempBrightness=None, isAvailable=True)
+        )
+        self.assertTrue(group_light.is_on)
+        self.assertAlmostEqual(group_light.brightness / 255 * 100, 50.0, delta=0.5)
+
+        # Turn off 3rd member (3/4 off -> 25% group brightness)
+        members[2]._update_light(
+            ExternalColorData(isHsl=True, hsv=[0, 0, 0], colorTempBrightness=None, isAvailable=True)
+        )
+        self.assertTrue(group_light.is_on)
+        self.assertAlmostEqual(group_light.brightness / 255 * 100, 25.0, delta=0.5)
+
+        # Turn off 4th member (4/4 off -> 0% group brightness, is_on = False)
+        members[3]._update_light(
+            ExternalColorData(isHsl=True, hsv=[0, 0, 0], colorTempBrightness=None, isAvailable=True)
+        )
+        self.assertFalse(group_light.is_on)
+        self.assertEqual(group_light.brightness, 0)
 
     def test_update_unavailable_data(self):
         """Test status update when isAvailable is False."""
@@ -284,19 +474,22 @@ class TestLightEntities(unittest.IsolatedAsyncioTestCase):
             isAvailable=False,
         )
         light._update_light(color_data_unavail)
-        # Should remain unavailable
         self.assertFalse(light.available)
 
     async def test_async_turn_on_basic(self):
-        """Test basic async_turn_on."""
+        """Test basic async_turn_on on device and group lights."""
         device = create_sample_device(mesh_address=7)
         light = HaoDengLight(self.mock_config_entry, device, self.mock_mqtt)
 
         await light.async_turn_on()
-
         self.assertTrue(light.is_on)
         self.mock_mqtt.turn_on.assert_awaited_once_with(7)
-        self.mock_mqtt.request_status.assert_called_once()
+
+        group = create_sample_group(group_id=25)
+        group_light = HaoDengGroupLight(self.mock_config_entry, group, self.mock_mqtt)
+        await group_light.async_turn_on()
+        self.assertTrue(group_light.is_on)
+        self.mock_mqtt.turn_on.assert_awaited_with(25)
 
     async def test_async_turn_on_with_hs_color(self):
         """Test async_turn_on with HS color."""
@@ -306,7 +499,7 @@ class TestLightEntities(unittest.IsolatedAsyncioTestCase):
         await light.async_turn_on(hs_color=(120, 100), brightness=255)
 
         self.assertTrue(light.is_on)
-        self.assertEqual(light._attr_color_mode, ColorMode.HS)
+        self.assertEqual(light.color_mode, ColorMode.HS)
         self.mock_mqtt.set_color.assert_awaited_once()
         args = self.mock_mqtt.set_color.await_args[0]
         self.assertEqual(args[0], 7)  # mesh_id
@@ -319,21 +512,20 @@ class TestLightEntities(unittest.IsolatedAsyncioTestCase):
         await group_light.async_turn_on(color_temp_kelvin=3500, brightness=200)
 
         self.assertTrue(group_light.is_on)
-        self.assertEqual(group_light._attr_color_mode, ColorMode.COLOR_TEMP)
+        self.assertEqual(group_light.color_mode, ColorMode.COLOR_TEMP)
         self.mock_mqtt.set_color_temp.assert_awaited_once_with(25, 3500, 200)
 
     async def test_async_turn_off(self):
-        """Test async_turn_off."""
+        """Test async_turn_off on device and group."""
         device = create_sample_device(mesh_address=7)
         light = HaoDengLight(self.mock_config_entry, device, self.mock_mqtt)
 
         await light.async_turn_off()
-
         self.assertFalse(light.is_on)
         self.mock_mqtt.turn_off.assert_awaited_once_with(7)
 
     def test_get_base_colors(self):
-        """Test get_base_colors normalization."""
+        """Test get_base_colors normalization on HaoDengLight."""
         device = create_sample_device(mesh_address=7)
         light = HaoDengLight(self.mock_config_entry, device, self.mock_mqtt)
 

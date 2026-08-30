@@ -43,26 +43,35 @@ class Device:
 
     def __init__(self, json) -> None:
         """Initialize."""
-        self.uniID = json["uniID"]
+        self.uniID = str(json["uniID"])
         self.userID = json["userID"]
         self.placeUniID = json["placeUniID"]
         self.macAddress = json["macAddress"]
         self.displayName = json["displayName"]
-        self.meshAddress = json["meshAddress"]
-        self.deviceType = json["deviceType"]
-        self.controlType = json["controlType"]
-        self.wiringType = json["wiringType"]
-        groups = [
-            json["group1ID"],
-            json["group2ID"],
-            json["group3ID"],
-            json["group4ID"],
-            json["group5ID"],
-            json["group6ID"],
-            json["group7ID"],
-            json["group8ID"],
+        self.meshAddress = int(json["meshAddress"])
+        self.deviceType = int(json["deviceType"])
+        self.controlType = int(json["controlType"])
+        self.wiringType = int(json["wiringType"])
+        raw_groups = [
+            json.get("group1ID"),
+            json.get("group2ID"),
+            json.get("group3ID"),
+            json.get("group4ID"),
+            json.get("group5ID"),
+            json.get("group6ID"),
+            json.get("group7ID"),
+            json.get("group8ID"),
         ]
-        self.groups = [x for x in groups if x > 0]
+        parsed_groups = []
+        for g in raw_groups:
+            if g is not None:
+                try:
+                    val = int(g)
+                    if val > 0:
+                        parsed_groups.append(val)
+                except (ValueError, TypeError):
+                    pass
+        self.groups = parsed_groups
 
 
 class Group:
@@ -76,11 +85,14 @@ class Group:
 
     def __init__(self, json) -> None:
         """Initialize."""
-        self.uniID = json["uniID"]
+        self.uniID = str(json["uniID"])
         self.CDPID = json.get("CDPID")
         self.userID = json["userID"]
         self.placeUniID = json["placeUniID"]
-        self.groupID = json["groupID"]
+        try:
+            self.groupID = int(json["groupID"]) if json.get("groupID") is not None else 0
+        except (ValueError, TypeError):
+            self.groupID = 0
         self.groupName = json["groupName"]
         self.lastUpdateDate = json.get("lastUpdateDate")
 
