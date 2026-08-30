@@ -12,6 +12,7 @@ control the above lights that you'd normally use through the Hao Deng App. It mi
 * As of right now, lights are only read in on server start. So when you add or modify lights (including adding them to groups) they will not be automatically updated and you'll need to restart home assistant (this is definitely a feature coming, but we're in beta right now!)
 * The Magic Cloud API doesn't seem to be able to handle more than 5 or so light updates at a time. This can make the lights stutter out of sync when updating a lot at once. Try not to update too many at once from Home Assistant. If you need to update a lot at once, create a group in the Hao Deng app. This will show up as a single light Home Assistant (you'll need to restart HA after you create the group in the app).
 * If this integration works for you, please hit the star button up there. It gives me the warm fuzzies to know this code is benefitting other people! :)
+* I can only test with the lights pictured above. I can't guarantee it'll work with any other type of light.
 
 ## Installation with HACS (recommended)
 Do you have [HACS](https://hacs.xyz/) installed?
@@ -74,4 +75,3 @@ Credit to
 **@SleepyNinja0o** started work on a bluetooth integration and had to give it up as it was unstable. However, I used his authentication
 code and got a lot of other helpful tidbits from his repo. Huge shotout to him for all his hard work!<br/><br/>
 
-<!-- Also, many kudos to **@donparlor** and **@cocoto** for their continued support on this project!<br/>It is appreciated very much! -->
