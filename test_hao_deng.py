@@ -559,7 +559,6 @@ async def run_control_type_test() -> bool:
 
     control_data = create_mock_control_data()
 
-    # Create a device with controlType=2 (like the user's deck lights)
     ct2_device = Device({
         "uniID": "device_ct2_001",
         "userID": "user_001",
@@ -580,7 +579,6 @@ async def run_control_type_test() -> bool:
         "group8ID": 0,
     })
 
-    # Create a device with controlType=5 (like the owner's can lights)
     ct5_device = Device({
         "uniID": "device_ct5_001",
         "userID": "user_001",
