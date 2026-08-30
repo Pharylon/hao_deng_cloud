@@ -284,7 +284,7 @@ class TestLightEntities(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(group_light.is_on)
         self.assertTrue(group_light.available)
         self.assertEqual(group_light.color_mode, ColorMode.HS)
-        self.assertEqual(group_light.hs_color, [180.0, 75.0])
+        self.assertEqual(group_light.hs_color, (180.0, 75.0))
         self.assertEqual(group_light.brightness, 0.8 * 255)
 
         # Simulate device light turning off
@@ -408,6 +408,89 @@ class TestLightEntities(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(dev.groups, [32771])
         self.assertEqual(grp.groupID, 32771)
         self.assertIn(grp.groupID, dev.groups)
+
+    def test_group_color_averaging_all_color_temp(self):
+        """Test color temperature averaging across multiple CT members."""
+        group = create_sample_group(group_id=10)
+        dev1 = create_sample_device(mesh_address=1, groups=[10])
+        dev2 = create_sample_device(mesh_address=2, groups=[10])
+
+        light1 = HaoDengLight(self.mock_config_entry, dev1, self.mock_mqtt)
+        light2 = HaoDengLight(self.mock_config_entry, dev2, self.mock_mqtt)
+
+        group_light = HaoDengGroupLight(
+            self.mock_config_entry, group, self.mock_mqtt, members=[light1, light2]
+        )
+
+        light1._update_light(
+            ExternalColorData(isHsl=False, hsv=None, colorTempBrightness=[3000, 1.0], isAvailable=True)
+        )
+        light2._update_light(
+            ExternalColorData(isHsl=False, hsv=None, colorTempBrightness=[5000, 1.0], isAvailable=True)
+        )
+
+        self.assertEqual(group_light.color_mode, ColorMode.COLOR_TEMP)
+        self.assertEqual(group_light.color_temp_kelvin, 4000)
+        self.assertIsNone(group_light.hs_color)
+
+    def test_group_color_averaging_all_hs(self):
+        """Test optical/additive HS color mixing across multiple HS members (Red + Blue -> Magenta)."""
+        group = create_sample_group(group_id=10)
+        dev1 = create_sample_device(mesh_address=1, groups=[10])
+        dev2 = create_sample_device(mesh_address=2, groups=[10])
+
+        light1 = HaoDengLight(self.mock_config_entry, dev1, self.mock_mqtt)
+        light2 = HaoDengLight(self.mock_config_entry, dev2, self.mock_mqtt)
+
+        group_light = HaoDengGroupLight(
+            self.mock_config_entry, group, self.mock_mqtt, members=[light1, light2]
+        )
+
+        # Red (0°, 100%)
+        light1._update_light(
+            ExternalColorData(isHsl=True, hsv=[0.0, 1.0, 1.0], colorTempBrightness=None, isAvailable=True)
+        )
+        # Blue (240°, 100%)
+        light2._update_light(
+            ExternalColorData(isHsl=True, hsv=[240.0, 1.0, 1.0], colorTempBrightness=None, isAvailable=True)
+        )
+
+        self.assertEqual(group_light.color_mode, ColorMode.HS)
+        self.assertIsNotNone(group_light.hs_color)
+        # Red + Blue mixes to Magenta (300°, 100%)
+        h, s = group_light.hs_color
+        self.assertAlmostEqual(h, 300.0, delta=2.0)
+        self.assertAlmostEqual(s, 100.0, delta=2.0)
+        self.assertIsNone(group_light.color_temp_kelvin)
+
+    def test_group_color_averaging_mixed_hs_and_ct(self):
+        """Test color mixing when some members are in Color Temp and some are in HS (Red + Cool White -> Pink)."""
+        group = create_sample_group(group_id=10)
+        dev1 = create_sample_device(mesh_address=1, groups=[10])
+        dev2 = create_sample_device(mesh_address=2, groups=[10])
+
+        light1 = HaoDengLight(self.mock_config_entry, dev1, self.mock_mqtt)
+        light2 = HaoDengLight(self.mock_config_entry, dev2, self.mock_mqtt)
+
+        group_light = HaoDengGroupLight(
+            self.mock_config_entry, group, self.mock_mqtt, members=[light1, light2]
+        )
+
+        # Red HS
+        light1._update_light(
+            ExternalColorData(isHsl=True, hsv=[0.0, 1.0, 1.0], colorTempBrightness=None, isAvailable=True)
+        )
+        # 6500K Cool White
+        light2._update_light(
+            ExternalColorData(isHsl=False, hsv=None, colorTempBrightness=[6500, 1.0], isAvailable=True)
+        )
+
+        self.assertEqual(group_light.color_mode, ColorMode.HS)
+        self.assertIsNotNone(group_light.hs_color)
+        h, s = group_light.hs_color
+        # Red hue preserved (0°), saturation halved (approx 50% pink)
+        self.assertAlmostEqual(h, 0.0, delta=5.0)
+        self.assertAlmostEqual(s, 50.0, delta=10.0)
 
     def test_group_step_by_step_shutoff_proportional_brightness(self):
         """Test that turning off 4 member lights one by one scales group brightness 100% -> 75% -> 50% -> 25% -> 0%."""
