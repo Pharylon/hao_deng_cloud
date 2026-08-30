@@ -37,10 +37,9 @@ Do you have [HACS](https://hacs.xyz/) installed?
 2. Click on `Devices & services`
 3. Click on `+ Add integration`
 4. Search for and select `Hao Deng Cloud`
-5. Enter you `username` and `password` you also use in the **Hao Deng** app
-6. The system will download you light list and add them to Home Assistant
-7. Once the system connects, the lights your lights will show up as _available_ and can be controlled from HA   
-8. Enjoy :)
+5. Enter the `username` and `password` you use in the **Hao Deng** app
+6. Once the system connects, your lights will show up as _available_ and can be controlled from HA   
+7. Enjoy :)
 
 ### Version 3.0 Updates and Breaking Changes
 1. Added support for multiple mesh places. **As part of this, device IDs will change in Home Assistant. You'll need to delete the old ones!**
@@ -54,7 +53,7 @@ Do you have [HACS](https://hacs.xyz/) installed?
 2. Make sure your country code is correct
 3. Make sure you have the newest version of this integration installed
 4. Restart your server once if you've made any chages to your lights recently
-6. Before submitting an issue, add `custom_components.hao_deng_cloud: debug` to the `logger` config in you `configuration.yaml`:
+5. Before submitting an issue, add `custom_components.hao_deng_cloud: debug` to the `logger` config in you `configuration.yaml`:
 
 ```yaml
 logger:

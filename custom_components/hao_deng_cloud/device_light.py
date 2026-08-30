@@ -26,7 +26,7 @@ class HaoDengLight(HaoDengBaseLight):
         mqtt_connector: MqttConnector,
     ) -> None:
         """Initialize the physical device light."""
-        _LOGGER.info("Initializing Light %s (ID %s)", device.displayName, device.uniID)
+        _LOGGER.debug("Initializing Light %s (ID %s)", device.displayName, device.uniID)
         super().__init__(
             config_entry=config_entry,
             mesh_id=device.meshAddress,
@@ -114,7 +114,7 @@ class HaoDengLight(HaoDengBaseLight):
                 and self._attr_color_mode != ColorMode.UNKNOWN
             ):
                 return
-            _LOGGER.info("Updating %s", self._attr_name)
+            _LOGGER.debug("Updating %s", self._attr_name)
             if color_data.isHsv:
                 self._update_hsv_values(color_data)
             else:

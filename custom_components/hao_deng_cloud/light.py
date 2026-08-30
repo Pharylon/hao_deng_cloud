@@ -54,7 +54,7 @@ async def async_setup_entry(
         )
         group_lights.append(group_light)
 
-    _LOGGER.info(
+    _LOGGER.debug(
         "Adding %d Hao Deng light entities (%d physical devices, %d group lights)",
         len(device_lights) + len(group_lights),
         len(device_lights),

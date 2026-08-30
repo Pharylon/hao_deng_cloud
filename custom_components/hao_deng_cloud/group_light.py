@@ -32,7 +32,7 @@ class HaoDengGroupLight(HaoDengBaseLight):
         members: list[HaoDengLight] = None,
     ) -> None:
         """Initialize the group light."""
-        _LOGGER.info(
+        _LOGGER.debug(
             "Initializing Group Light %s (GroupID: %s)",
             group.groupName,
             group.groupID,
@@ -51,7 +51,7 @@ class HaoDengGroupLight(HaoDengBaseLight):
             for member in members:
                 self.add_member(member)
         self._update_from_group()
-        _LOGGER.info(
+        _LOGGER.debug(
             "Group Light %s (GroupID: %s) configured with %d members: %s",
             group.groupName,
             group.groupID,

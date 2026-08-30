@@ -118,7 +118,7 @@ class RestApiConnector:
         async with aiohttp.ClientSession() as session:
             async with session.post(uri, headers=headers, json=payload) as response:
                 response_json = await response.json()
-                _LOGGER.info("Login response JSON: %s", response_json)
+                _LOGGER.debug("Login response JSON: %s", response_json)
                 if response.status != 200:
                     raise Exception(
                         "Login failed - %s"
@@ -146,11 +146,11 @@ class RestApiConnector:
                 + MAGICHUE_GET_MESH_ENDPOINT
                 + urllib.parse.quote_plus(self._user_id)
             )
-            _LOGGER.info("URI: %s", uri)
+            _LOGGER.debug("URI: %s", uri)
             async with aiohttp.ClientSession() as session:
                 async with session.get(uri, headers=headers) as response:
                     response_json = await response.json()
-                    _LOGGER.info("Mesh place items response JSON: %s", response_json)
+                    _LOGGER.debug("Mesh place items response JSON: %s", response_json)
                     if response.status != 200:
                         raise Exception(
                             "Device retrieval for mesh failed - %s"
@@ -186,7 +186,7 @@ class RestApiConnector:
         async with aiohttp.ClientSession() as session:  # noqa: SIM117
             async with session.get(endpoint, headers=headers, timeout=30) as response:
                 response_json = await response.json()
-                _LOGGER.info("MQTT control data response JSON: %s", response_json)
+                _LOGGER.debug("MQTT control data response JSON: %s", response_json)
                 if response.status != 200:
                     raise Exception(
                         "Device retrieval for mesh failed - {}".format(
@@ -230,7 +230,7 @@ class RestApiConnector:
                     headers=headers,
                 ) as response:
                     response_json = await response.json()
-                    _LOGGER.info("Mesh devices response JSON: %s", response_json)
+                    _LOGGER.debug("Mesh devices response JSON: %s", response_json)
                     if response.status != 200:
                         raise Exception(  # noqa: TRY002
                             "Device retrieval for mesh failed - {}".format(
@@ -276,7 +276,7 @@ class RestApiConnector:
                     headers=headers,
                 ) as response:
                     response_json = await response.json()
-                    _LOGGER.info("Mesh groups response JSON: %s", response_json)
+                    _LOGGER.debug("Mesh groups response JSON: %s", response_json)
                     if response.status != 200:
                         raise Exception(  # noqa: TRY002
                             "Group retrieval for mesh failed - {}".format(
