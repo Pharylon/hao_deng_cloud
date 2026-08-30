@@ -44,12 +44,23 @@ class MqttConnector:
             elif x.deviceType == "SOFTWARE":
                 self.software = x
         self._groups: dict[int, list[int]] = {}
+        self._control_types: dict[int, int] = {}
         if devices:
             for d in devices:
+                self._control_types[d.meshAddress] = d.controlType
                 for g in d.groups:
                     if g not in self._groups:
                         self._groups[g] = []
                     self._groups[g].append(d.meshAddress)
+            # Derive controlType for group addresses from first member device
+            for g_id, member_addrs in self._groups.items():
+                if member_addrs and member_addrs[0] in self._control_types:
+                    self._control_types[g_id] = self._control_types[member_addrs[0]]
+
+    def _get_control_type_hex(self, device_id: int) -> str:
+        """Get the 2-digit hex control type prefix for a device or group address."""
+        ct = self._control_types.get(device_id, 5)
+        return f"{ct:02X}"
 
     def get_server_addr(self):
         """Get the server address for the country code."""
@@ -106,20 +117,23 @@ class MqttConnector:
             green = green - 1
             blue = blue - 1
         hexValue = f"{int(red):02x}{int(green):02x}{int(blue):02x}".upper()
-        payload = MqttLightPayload(deviceId, "E2", f"0560{hexValue}00000200")
+        ct = self._get_control_type_hex(deviceId)
+        payload = MqttLightPayload(deviceId, "E2", f"{ct}60{hexValue}00000200")
         # _LOGGER.info("Adding to que %s", payload.dstAdr)
         await self._add_to_queue(payload)
 
     async def turn_on(self, deviceId: int):
         """Turn the light on."""
         _LOGGER.info("TURN_ON for ID %s", deviceId)
-        payload = MqttLightPayload(deviceId, "D0", "0501FF000000000300")
+        ct = self._get_control_type_hex(deviceId)
+        payload = MqttLightPayload(deviceId, "D0", f"{ct}01FF000000000300")
         await self._add_to_queue(payload)
 
     async def turn_off(self, deviceId: int):
         """Turn the light off."""
         _LOGGER.info("TURN_OFF for ID %s", deviceId)
-        payload = MqttLightPayload(deviceId, "D0", "050100000000000300")
+        ct = self._get_control_type_hex(deviceId)
+        payload = MqttLightPayload(deviceId, "D0", f"{ct}0100000000000300")
         await self._add_to_queue(payload)
 
     async def set_color_temp(self, deviceId: int, color_temp: int, brigthness: int):
@@ -133,8 +147,9 @@ class MqttConnector:
             hex_value = f"{int(translated_number):02x}".upper()
             brightness_percent = int(math.ceil(brigthness * 100 / 255))
             brightness_hexe = f"{brightness_percent:02x}".upper()
+            ct = self._get_control_type_hex(deviceId)
             payload = MqttLightPayload(
-                deviceId, "E2", f"0562{hex_value}{brightness_hexe}0000000200"
+                deviceId, "E2", f"{ct}62{hex_value}{brightness_hexe}0000000200"
             )
             await self._add_to_queue(payload)
 

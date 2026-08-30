@@ -306,7 +306,7 @@ def create_mock_devices() -> list[Device]:
                 "displayName": f"Ceiling Light {i}",
                 "meshAddress": i,
                 "deviceType": 1,
-                "controlType": 1,
+                "controlType": 5,
                 "wiringType": 1,
                 "group1ID": 100,
                 "group2ID": 0,
@@ -549,6 +549,136 @@ async def run_mock_test() -> bool:
 
     print(f"\n{BOLD}{GREEN}========================================================================{RESET}")
     print(f"{BOLD}{GREEN}  ALL MOCK TESTS (DEVICE, GROUP & MEMBER DERIVATION) PASSED SUCCESSFULLY!{RESET}")
+    print(f"{BOLD}{GREEN}========================================================================{RESET}\n")
+    return True
+
+
+async def run_control_type_test() -> bool:
+    """Test that devices with different controlType values produce correct payload prefixes."""
+    print(f"\n{BOLD}{CYAN}=== Starting Control Type Variant Test ==={RESET}\n")
+
+    control_data = create_mock_control_data()
+
+    # Create a device with controlType=2 (like the user's deck lights)
+    ct2_device = Device({
+        "uniID": "device_ct2_001",
+        "userID": "user_001",
+        "placeUniID": "place_001",
+        "macAddress": "F8:1D:78:68:B9:9A",
+        "displayName": "Deck Light CT2",
+        "meshAddress": 10,
+        "deviceType": 2,
+        "controlType": 2,
+        "wiringType": 2,
+        "group1ID": 200,
+        "group2ID": 0,
+        "group3ID": 0,
+        "group4ID": 0,
+        "group5ID": 0,
+        "group6ID": 0,
+        "group7ID": 0,
+        "group8ID": 0,
+    })
+
+    # Create a device with controlType=5 (like the owner's can lights)
+    ct5_device = Device({
+        "uniID": "device_ct5_001",
+        "userID": "user_001",
+        "placeUniID": "place_001",
+        "macAddress": "08:65:F0:15:84:1D",
+        "displayName": "Can Light CT5",
+        "meshAddress": 20,
+        "deviceType": 32951,
+        "controlType": 5,
+        "wiringType": 4,
+        "group1ID": 300,
+        "group2ID": 0,
+        "group3ID": 0,
+        "group4ID": 0,
+        "group5ID": 0,
+        "group6ID": 0,
+        "group7ID": 0,
+        "group8ID": 0,
+    })
+
+    devices = [ct2_device, ct5_device]
+    connector = MqttConnector(control_data, "US", devices)
+
+    mock_client = MockMqttClient()
+    connector.client = mock_client
+    connector.client_connected = True
+
+    expected_topic = f"/{connector.software.productKey}/{connector.software.deviceName}/control"
+
+    # --- Test controlType=2 device ---
+    print(f"{BOLD}[1/8] Testing Turn ON for controlType=2 device...{RESET}")
+    mock_client.published_messages.clear()
+    await connector.turn_on(ct2_device.meshAddress)
+    _, pub_payload, _ = mock_client.published_messages[-1]
+    payload_dict = json.loads(pub_payload)
+    assert payload_dict["data"] == "0201FF000000000300", f"Expected 02 prefix, got: {payload_dict['data']}"
+    print(f"      {GREEN}✓ Turn ON data starts with '02': {payload_dict['data']}{RESET}")
+
+    print(f"\n{BOLD}[2/8] Testing Turn OFF for controlType=2 device...{RESET}")
+    mock_client.published_messages.clear()
+    await connector.turn_off(ct2_device.meshAddress)
+    _, pub_payload, _ = mock_client.published_messages[-1]
+    payload_dict = json.loads(pub_payload)
+    assert payload_dict["data"] == "020100000000000300", f"Expected 02 prefix, got: {payload_dict['data']}"
+    print(f"      {GREEN}✓ Turn OFF data starts with '02': {payload_dict['data']}{RESET}")
+
+    print(f"\n{BOLD}[3/8] Testing Set Color for controlType=2 device...{RESET}")
+    mock_client.published_messages.clear()
+    await connector.set_color(ct2_device.meshAddress, 255, 0, 0)
+    _, pub_payload, _ = mock_client.published_messages[-1]
+    payload_dict = json.loads(pub_payload)
+    assert payload_dict["data"].startswith("0260"), f"Expected 0260 prefix, got: {payload_dict['data']}"
+    print(f"      {GREEN}✓ Set Color data starts with '0260': {payload_dict['data']}{RESET}")
+
+    print(f"\n{BOLD}[4/8] Testing Set Color Temp for controlType=2 device...{RESET}")
+    mock_client.published_messages.clear()
+    await connector.set_color_temp(ct2_device.meshAddress, 4500, 200)
+    _, pub_payload, _ = mock_client.published_messages[-1]
+    payload_dict = json.loads(pub_payload)
+    assert payload_dict["data"].startswith("0262"), f"Expected 0262 prefix, got: {payload_dict['data']}"
+    print(f"      {GREEN}✓ Set Color Temp data starts with '0262': {payload_dict['data']}{RESET}")
+
+    # --- Test controlType=5 device (should still work as before) ---
+    print(f"\n{BOLD}[5/8] Testing Turn ON for controlType=5 device...{RESET}")
+    mock_client.published_messages.clear()
+    await connector.turn_on(ct5_device.meshAddress)
+    _, pub_payload, _ = mock_client.published_messages[-1]
+    payload_dict = json.loads(pub_payload)
+    assert payload_dict["data"] == "0501FF000000000300", f"Expected 05 prefix, got: {payload_dict['data']}"
+    print(f"      {GREEN}✓ Turn ON data starts with '05': {payload_dict['data']}{RESET}")
+
+    print(f"\n{BOLD}[6/8] Testing Turn OFF for controlType=5 device...{RESET}")
+    mock_client.published_messages.clear()
+    await connector.turn_off(ct5_device.meshAddress)
+    _, pub_payload, _ = mock_client.published_messages[-1]
+    payload_dict = json.loads(pub_payload)
+    assert payload_dict["data"] == "050100000000000300", f"Expected 05 prefix, got: {payload_dict['data']}"
+    print(f"      {GREEN}✓ Turn OFF data starts with '05': {payload_dict['data']}{RESET}")
+
+    print(f"\n{BOLD}[7/8] Testing Set Color for controlType=5 device...{RESET}")
+    mock_client.published_messages.clear()
+    await connector.set_color(ct5_device.meshAddress, 255, 0, 0)
+    _, pub_payload, _ = mock_client.published_messages[-1]
+    payload_dict = json.loads(pub_payload)
+    assert payload_dict["data"].startswith("0560"), f"Expected 0560 prefix, got: {payload_dict['data']}"
+    print(f"      {GREEN}✓ Set Color data starts with '0560': {payload_dict['data']}{RESET}")
+
+    print(f"\n{BOLD}[8/8] Testing Group with controlType=2 members...{RESET}")
+    group_id = 200  # Group that ct2_device belongs to
+    mock_client.published_messages.clear()
+    await connector.turn_on(group_id)
+    _, pub_payload, _ = mock_client.published_messages[-1]
+    payload_dict = json.loads(pub_payload)
+    assert payload_dict["data"] == "0201FF000000000300", f"Expected 02 prefix for group, got: {payload_dict['data']}"
+    print(f"      {GREEN}✓ Group Turn ON inherits controlType=2 from member: {payload_dict['data']}{RESET}")
+
+    print(f"\n{BOLD}{GREEN}========================================================================{RESET}")
+    print(f"{BOLD}{GREEN}  ALL CONTROL TYPE VARIANT TESTS PASSED SUCCESSFULLY!{RESET}")
     print(f"{BOLD}{GREEN}========================================================================{RESET}\n")
     return True
 
@@ -991,6 +1121,8 @@ def main():
         )
     else:
         success = asyncio.run(run_mock_test())
+        if success:
+            success = asyncio.run(run_control_type_test())
 
     sys.exit(0 if success else 1)
 
