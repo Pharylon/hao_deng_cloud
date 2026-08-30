@@ -243,8 +243,8 @@ class HaoDengLight(LightEntity):
         """Return the device info."""
         return DeviceInfo(
             identifiers={
-                # Serial numbers are unique identifiers within a specific domain
-                ("hao_deng_cloud", self._mesh_id)
+                # Use globally unique cloud ID instead of local meshAddress to prevent cross-place merges
+                ("hao_deng_cloud", self._attr_unique_id)
             },
             name=self.name,
             manufacturer="Hao Deng",
@@ -297,7 +297,10 @@ class HaoDengGroupLight(HaoDengLight):
     def device_info(self) -> DeviceInfo:
         """Return the device info."""
         return DeviceInfo(
-            identifiers={("hao_deng_cloud", f"group_{self._mesh_id}")},
+            identifiers={
+                # Use globally unique cloud ID instead of local groupID to prevent cross-place merges
+                ("hao_deng_cloud", self._attr_unique_id)
+            },
             name=self.name,
             manufacturer="Hao Deng",
             model="Hao Deng Light Group",
