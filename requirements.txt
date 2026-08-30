@@ -1,0 +1,5 @@
+aiohttp
+paho-mqtt
+cryptography
+pycryptodome>=3.17
+

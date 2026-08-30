@@ -71,7 +71,7 @@ class MqttConnector:
         def on_message(client, userdata, msg):
             data = json.loads(msg.payload.decode("ASCII"))
             for d in data:
-                # _LOGGER.info("ON_MESSAGE: A: %d, D: %s", d["a"], d["d"])
+                #_LOGGER.info("ON_MESSAGE: A: %d, D: %s", d["a"], d["d"])
                 self._update_timestamps[d["a"]] = time.time()
                 color_tuple = self._convert_notification_data_to_color_data(
                     d["d"], d["a"]
@@ -171,7 +171,7 @@ class MqttConnector:
             bright_percent = int(brightness, 16) / 100
             # _LOGGER.info("Incoming Bright %s %s", brightness, bright_percent)
             if saturation_percent == 0 or bright_percent == 0:
-                return ExternalColorData(True, [0, 0, 0], [0, 0], data[0:2] == "00")
+                return ExternalColorData(True, [0, 0, 0], [0, 0], data[0:2] != "00")
             # rgb = hsl_to_rgb(hue_360, saturation_percent, bright_percent)
             ecd = ExternalColorData(
                 True,

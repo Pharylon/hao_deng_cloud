@@ -4,11 +4,18 @@ import asyncio
 import logging
 from typing import Literal
 
-from homeassistant.components.light import DOMAIN as LIGHT_DOMAIN
-from homeassistant.components.sensor import DOMAIN as SENSOR_DOMAIN
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
-from homeassistant.helpers import device_registry as dr
+try:
+    from homeassistant.components.light import DOMAIN as LIGHT_DOMAIN
+    from homeassistant.components.sensor import DOMAIN as SENSOR_DOMAIN
+    from homeassistant.config_entries import ConfigEntry
+    from homeassistant.core import HomeAssistant
+    from homeassistant.helpers import device_registry as dr
+except ImportError:
+    LIGHT_DOMAIN = "light"
+    SENSOR_DOMAIN = "sensor"
+    ConfigEntry = object  # type: ignore
+    HomeAssistant = object  # type: ignore
+    dr = None  # type: ignore
 
 from .const import DOMAIN
 
