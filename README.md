@@ -7,12 +7,16 @@ Control your Hao Deng Lights mesh lights from Home Assistant! This integration a
 control the above lights that you'd normally use through the Hao Deng App. It might work if you use the Magic Light BLE or Magic Home Pro app as well (see below).
 ## Important Notes
 
-* This integration is in beta. Please open an issue if you have any problems!
 * This integration uses the cloud. If you don't have a wifi bridge, this won't work (ie, if you can control your lights with the Hao Deng app when you're away from home, you're good. If you have to be at your house to use it, you're not good)
-* As of right now, lights are only read in on server start. So when you add or modify lights (including adding them to groups) they will not be automatically updated and you'll need to restart home assistant (this is definitely a feature coming, but we're in beta right now!)
+* Lights are only read in on server start. So when you add or modify lights (including adding them to groups) they will not be automatically updated and you'll need to restart home assistant.
 * The Magic Cloud API doesn't seem to be able to handle more than 5 or so light updates at a time. This can make the lights stutter out of sync when updating a lot at once. Try not to update too many at once from Home Assistant. If you need to update a lot at once, create a group in the Hao Deng app. This will show up as a single light Home Assistant (you'll need to restart HA after you create the group in the app).
 * If this integration works for you, please hit the star button up there. It gives me the warm fuzzies to know this code is benefitting other people! :)
 * I can only test with the lights pictured above. I can't guarantee it'll work with any other type of light.
+
+### Version 3.0 Updates and Breaking Changes
+1. Added support for multiple mesh places. **As part of this, device IDs will change in Home Assistant. You'll need to delete the old ones!**
+2. Groups of lights in the Hao Deng app will now be imported as lights into Home Assistant! After you have your groups set up in the Hao Deng app, reboot home assistant to pick them up!
+
 
 ## Installation with HACS (recommended)
 Do you have [HACS](https://hacs.xyz/) installed?
@@ -40,11 +44,6 @@ Do you have [HACS](https://hacs.xyz/) installed?
 5. Enter the `username` and `password` you use in the **Hao Deng** app
 6. Once the system connects, your lights will show up as _available_ and can be controlled from HA   
 7. Enjoy :)
-
-### Version 3.0 Updates and Breaking Changes
-1. Added support for multiple mesh places. **As part of this, device IDs will change in Home Assistant. You'll need to delete the old ones!**
-2. Gropus of lights in the Hao Deng app will now be imported as lights into Home Assistant! After you have your groups set up in the Hao Deng app, reboot home assistant to pick them up!
-
 
 
 ## Troubleshooting
